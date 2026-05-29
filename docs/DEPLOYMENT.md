@@ -142,7 +142,7 @@ Use the backup script before upgrades and on a schedule:
 npm run backup
 ```
 
-The script copies local SQLite databases and file objects into `OPENBACKEND_BACKUP_DIR`.
+The script copies local SQLite databases and file objects into `OPENBACKEND_BACKUP_DIR`. When `OPENBACKEND_DATABASE=postgres`, it also writes `postgres-documents.json`. When `OPENBACKEND_STORAGE=minio`, it mirrors bucket objects into a `minio/` backup folder.
 
 Restore the latest backup:
 
@@ -157,6 +157,7 @@ npm run restore -- ./backups/2026-05-29T15-33-32.371Z
 ```
 
 Stop the server before restoring so SQLite files are not open while being replaced.
+For PostgreSQL and MinIO profiles, keep the database/object services running and stop only the OpenBackend app before restore.
 
 ## Kiosk and Device Writes
 

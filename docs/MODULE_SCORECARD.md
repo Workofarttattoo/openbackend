@@ -11,7 +11,7 @@ Use this scorecard to keep module quality visible as OpenBackend grows.
 | Functions | Local HTTP trigger with audit logging, timeout, and worker isolation option | Medium | Strong sandbox policies and resource quotas |
 | Dashboard | Login/bootstrap and protected admin calls | Medium | Import UI and API-key management |
 | SDK | CRUD, auth, storage, functions, watch, auth headers | Medium | Migration helpers and offline queue |
-| DevOps | Docker Compose, healthcheck, env docs, backup/restore scripts | Medium | Release packaging |
+| DevOps | Docker Compose, CI, healthcheck, env docs, backup/restore scripts | Medium | Release packaging |
 
 ## Scoring Rules
 

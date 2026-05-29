@@ -219,6 +219,17 @@ app.post("/api/admin/auth/api-keys", async (c) => {
   return c.json(apiKey, 201);
 });
 
+app.get("/api/admin/config/collection-permissions", (c) => c.json(config.collectionPermissions));
+
+app.post("/api/admin/config/collection-permissions", async (c) => {
+  const body = await c.req.json<Record<string, { read?: AuthRole[]; write?: AuthRole[] }>>();
+  config.collectionPermissions = normalizeCollectionPermissions(body);
+  audit("config.collection_permissions.updated", {
+    collections: Object.keys(config.collectionPermissions)
+  });
+  return c.json(config.collectionPermissions);
+});
+
 app.post("/api/files", async (c) => {
   const contentLength = Number(c.req.header("content-length") ?? "0");
   if (contentLength > config.maxUploadBytes) {
@@ -338,6 +349,28 @@ function canWriteCollection(collection: string, authorization: string | undefine
   }
 
   return hasRole(authorization, apiKey, roles);
+}
+
+function normalizeCollectionPermissions(
+  permissions: Record<string, { read?: AuthRole[]; write?: AuthRole[] }>
+): Record<string, { read?: AuthRole[]; write?: AuthRole[] }> {
+  return Object.fromEntries(
+    Object.entries(permissions).map(([collection, permission]) => [
+      collection,
+      {
+        read: normalizeRoles(permission.read),
+        write: normalizeRoles(permission.write)
+      }
+    ])
+  );
+}
+
+function normalizeRoles(roles: AuthRole[] | undefined): AuthRole[] | undefined {
+  if (!roles) {
+    return undefined;
+  }
+
+  return roles.filter((role) => ["admin", "editor", "viewer", "device"].includes(role));
 }
 
 function resolvePrincipal(authorization: string | undefined, apiKey: string | null | undefined): Principal | null {

@@ -23,6 +23,7 @@ function App() {
   const [apiKeyRole, setApiKeyRole] = useState("device");
   const [newApiKey, setNewApiKey] = useState("");
   const [importJson, setImportJson] = useState("");
+  const [permissionJson, setPermissionJson] = useState("{}");
   const [status, setStatus] = useState("Ready");
   const client = useMemo(() => createOpenBackend({ url: backendUrl, token }), [token]);
   const db = useMemo(() => client.database(), [client]);
@@ -32,12 +33,13 @@ function App() {
   }, [client]);
 
   const refresh = async () => {
-    const [items, userList, apiKeyList, fileList, functionList] = await Promise.all([
+    const [items, userList, apiKeyList, fileList, functionList, permissions] = await Promise.all([
       db.collection<Record<string, unknown>>(collection).list(),
       fetchJson<Array<unknown>>("/api/admin/auth/users", token),
       fetchJson<Array<unknown>>("/api/admin/auth/api-keys", token),
       fetchJson<Array<unknown>>("/api/files", token),
-      fetchJson<Array<string>>("/api/functions", token)
+      fetchJson<Array<string>>("/api/functions", token),
+      fetchJson<Record<string, unknown>>("/api/admin/config/collection-permissions", token)
     ]);
 
     setDocuments(items);
@@ -45,6 +47,7 @@ function App() {
     setApiKeys(apiKeyList);
     setFiles(fileList);
     setFunctions(functionList);
+    setPermissionJson(JSON.stringify(permissions, null, 2));
   };
 
   useEffect(() => {
@@ -119,6 +122,16 @@ function App() {
     });
     setStatus("File deleted");
     await refresh();
+  };
+
+  const savePermissions = async () => {
+    const saved = await postJson<Record<string, unknown>>(
+      "/api/admin/config/collection-permissions",
+      JSON.parse(permissionJson),
+      token
+    );
+    setPermissionJson(JSON.stringify(saved, null, 2));
+    setStatus("Collection permissions saved");
   };
 
   if (!token) {
@@ -238,6 +251,18 @@ function App() {
             />
           </label>
           <button onClick={importData} disabled={!importJson.trim()}><Upload size={18} /> Import</button>
+        </section>
+
+        <section className="permissions-editor">
+          <header>
+            <h2>Collection Rules</h2>
+            <button onClick={savePermissions}><Upload size={18} /> Save</button>
+          </header>
+          <textarea
+            value={permissionJson}
+            onChange={(event) => setPermissionJson(event.target.value)}
+            spellCheck={false}
+          />
         </section>
 
         <section className="grid">

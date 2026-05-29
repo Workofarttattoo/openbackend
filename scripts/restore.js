@@ -23,6 +23,14 @@ for (const name of ["openbackend.sqlite", "auth.sqlite", "storage.sqlite"]) {
 
 restoreIfExists(join(backupDir, "files"), join(dataDir, "files"), true);
 
+if ((process.env.OPENBACKEND_DATABASE ?? "sqlite") === "postgres" && process.env.OPENBACKEND_POSTGRES_URL) {
+  await restorePostgres(backupDir);
+}
+
+if ((process.env.OPENBACKEND_STORAGE ?? "filesystem") === "minio" && process.env.OPENBACKEND_S3_ENDPOINT) {
+  await restoreMinio(backupDir);
+}
+
 console.log(`[info] Restored backup from ${backupDir}`);
 
 function latestBackup(root) {
@@ -67,4 +75,93 @@ function loadDotenv() {
     const [key, ...valueParts] = trimmed.split("=");
     process.env[key] ??= valueParts.join("=").replace(/^"|"$/g, "");
   }
+}
+
+async function restorePostgres(backupDir) {
+  const source = join(backupDir, "postgres-documents.json");
+  if (!existsSync(source)) {
+    return;
+  }
+
+  const pg = await import("pg");
+  const pool = new pg.Pool({ connectionString: process.env.OPENBACKEND_POSTGRES_URL });
+  const snapshot = JSON.parse(readFileSync(source, "utf8"));
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await client.query(`
+      create table if not exists documents (
+        id text not null,
+        collection text not null,
+        data jsonb not null,
+        revision integer not null default 1,
+        created_at timestamptz not null,
+        updated_at timestamptz not null,
+        deleted_at timestamptz,
+        primary key (collection, id)
+      )
+    `);
+    for (const record of snapshot.documents ?? []) {
+      await client.query(
+        `insert into documents (id, collection, data, revision, created_at, updated_at, deleted_at)
+         values ($1, $2, $3, $4, $5, $6, $7)
+         on conflict(collection, id) do update set
+           data = excluded.data,
+           revision = excluded.revision,
+           created_at = excluded.created_at,
+           updated_at = excluded.updated_at,
+           deleted_at = excluded.deleted_at`,
+        [
+          record.id,
+          record.collection,
+          JSON.stringify(record.data),
+          record.revision ?? 1,
+          record.created_at ?? record.createdAt ?? new Date().toISOString(),
+          record.updated_at ?? record.updatedAt ?? new Date().toISOString(),
+          record.deleted_at ?? record.deletedAt ?? null
+        ]
+      );
+    }
+    await client.query("commit");
+    console.log("[info] Restored PostgreSQL documents");
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+    await pool.end();
+  }
+}
+
+async function restoreMinio(backupDir) {
+  const sourceDir = join(backupDir, "minio");
+  if (!existsSync(sourceDir)) {
+    return;
+  }
+
+  const { Client } = await import("minio");
+  const bucket = process.env.OPENBACKEND_S3_BUCKET ?? "openbackend";
+  const client = createMinioClient(Client);
+  if (!(await client.bucketExists(bucket))) {
+    await client.makeBucket(bucket);
+  }
+
+  for (const entry of readdirSync(sourceDir)) {
+    const objectName = decodeURIComponent(entry);
+    const data = readFileSync(join(sourceDir, entry));
+    await client.putObject(bucket, objectName, data, data.byteLength);
+  }
+
+  console.log("[info] Restored MinIO bucket objects");
+}
+
+function createMinioClient(Client) {
+  const endpoint = new URL(process.env.OPENBACKEND_S3_ENDPOINT);
+  return new Client({
+    endPoint: endpoint.hostname,
+    port: endpoint.port ? Number(endpoint.port) : (endpoint.protocol === "https:" ? 443 : 80),
+    useSSL: endpoint.protocol === "https:",
+    accessKey: process.env.OPENBACKEND_S3_ACCESS_KEY_ID ?? process.env.MINIO_ROOT_USER ?? "openbackend",
+    secretKey: process.env.OPENBACKEND_S3_SECRET_ACCESS_KEY ?? process.env.MINIO_ROOT_PASSWORD ?? "change-this-minio-password"
+  });
 }

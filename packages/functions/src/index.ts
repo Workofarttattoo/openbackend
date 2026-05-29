@@ -54,9 +54,28 @@ function runInWorker(source: string, context: FunctionContext, timeoutMs: number
     const worker = new Worker(
       `
         const { parentPort, workerData } = require("node:worker_threads");
+        const vm = require("node:vm");
         Promise.resolve()
           .then(() => {
-            const fn = eval(workerData.source);
+            const sandbox = Object.freeze({
+              console: Object.freeze({
+                log: (...args) => parentPort.postMessage({ log: args.map(String).join(" ") }),
+                error: (...args) => parentPort.postMessage({ log: args.map(String).join(" ") })
+              })
+            });
+            const script = new vm.Script("(" + workerData.source + ")", {
+              filename: "openbackend-function.vm.js"
+            });
+            const fn = script.runInNewContext(sandbox, {
+              timeout: workerData.timeoutMs,
+              contextCodeGeneration: {
+                strings: false,
+                wasm: false
+              }
+            });
+            if (typeof fn !== "function") {
+              throw new Error("Isolated function source must evaluate to a function");
+            }
             return fn(workerData.context);
           })
           .then((result) => parentPort.postMessage({ ok: true, result }))
@@ -64,9 +83,15 @@ function runInWorker(source: string, context: FunctionContext, timeoutMs: number
       `,
       {
         eval: true,
+        resourceLimits: {
+          maxOldGenerationSizeMb: 32,
+          maxYoungGenerationSizeMb: 8,
+          stackSizeMb: 2
+        },
         workerData: {
           source,
-          context
+          context: JSON.parse(JSON.stringify(context)),
+          timeoutMs
         }
       }
     );
@@ -76,7 +101,11 @@ function runInWorker(source: string, context: FunctionContext, timeoutMs: number
       reject(new Error(`Function timed out after ${timeoutMs}ms`));
     }, timeoutMs);
 
-    worker.once("message", (message: { ok: boolean; result?: unknown; error?: string }) => {
+    worker.on("message", (message: { ok?: boolean; result?: unknown; error?: string; log?: string }) => {
+      if (message.log) {
+        return;
+      }
+
       clearTimeout(timeout);
       void worker.terminate();
       if (message.ok) {

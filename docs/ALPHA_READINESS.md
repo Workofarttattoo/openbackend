@@ -20,6 +20,7 @@ OpenBackend is ready for private self-hosted alpha testing.
 - Dashboard login/bootstrap, collection create, API-key creation, import, export, and file delete.
 - Website, POS/kiosk, and IoT starter examples.
 - Backup and restore scripts.
+- PostgreSQL and MinIO backup/restore support.
 - Server smoke tests.
 - Docker profile smoke test commands for local, NAS, and VPS.
 - Real-domain TLS validation script and checklist.

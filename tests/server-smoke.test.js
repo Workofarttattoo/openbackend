@@ -178,6 +178,23 @@ describe("server deploy smoke", () => {
     assert.equal(viewerWrite.status, 401);
   });
 
+  it("updates collection permissions through admin config", async () => {
+    const saved = await post(
+      "/api/admin/config/collection-permissions",
+      {
+        locked_posts: {
+          read: ["admin"],
+          write: ["admin"]
+        }
+      },
+      token
+    );
+    assert.deepEqual(saved.locked_posts.read, ["admin"]);
+
+    const anonymousRead = await fetch(`${baseUrl}/api/collections/locked_posts/documents`);
+    assert.equal(anonymousRead.status, 401);
+  });
+
   it("requires auth for realtime sockets", async () => {
     const denied = await socketCloseCode(`${baseUrl.replace("http", "ws")}/realtime`);
     assert.equal(denied, 1008);

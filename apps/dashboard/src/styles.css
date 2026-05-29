@@ -14,7 +14,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -163,6 +164,33 @@ h2 {
   gap: 12px;
   margin-bottom: 20px;
   flex-wrap: wrap;
+}
+
+.permissions-editor {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 20px;
+  background: #ffffff;
+  border: 1px solid #dde4dc;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.permissions-editor header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.permissions-editor textarea {
+  width: 100%;
+  min-height: 140px;
+  border: 1px solid #cfd8d0;
+  border-radius: 8px;
+  padding: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  resize: vertical;
 }
 
 label {
