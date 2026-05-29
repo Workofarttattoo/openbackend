@@ -31,6 +31,8 @@ This project is inspired by the broad developer-experience category of hosted ba
 See [docs/CLEAN_ROOM.md](docs/CLEAN_ROOM.md) for the full safety note.
 See [docs/RESEARCH.md](docs/RESEARCH.md) for the first-pass open-source component evaluation.
 See [docs/HOSTED_BACKEND_PARITY.md](docs/HOSTED_BACKEND_PARITY.md) for the clean-room parity matrix.
+See [docs/BMAD_BUILD_PLAN.md](docs/BMAD_BUILD_PLAN.md), [docs/MODULE_SCORECARD.md](docs/MODULE_SCORECARD.md), and [docs/DEPLOY_READINESS.md](docs/DEPLOY_READINESS.md) for project execution tracking.
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for local, NAS, and Docker deployment notes.
 
 ## Quick Start
 
@@ -40,6 +42,35 @@ npm run dev
 ```
 
 The server starts on `http://localhost:8787` and the dashboard starts on `http://localhost:5173`.
+
+For deploy configuration:
+
+```bash
+cp .env.example .env
+```
+
+## Self-Hosted Alpha
+
+```bash
+cp .env.example .env
+npm install
+npm run build
+npm run dev
+```
+
+For Docker:
+
+```bash
+docker compose up --build
+```
+
+Before upgrades or experiments, create a local snapshot:
+
+```bash
+npm run backup
+```
+
+The first dashboard visit bootstraps an admin user. After bootstrap, protected admin APIs require a session bearer token or `x-openbackend-api-key`.
 
 ## SDK Example
 

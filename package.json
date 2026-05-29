@@ -13,6 +13,7 @@
     "dev": "npm run build:packages && npm run dev -w apps/server",
     "dev:all": "npm run build:packages && concurrently \"npm run dev -w apps/server\" \"npm run dev -w apps/dashboard\"",
     "build": "npm run build:packages && npm run build -w apps/server -w apps/dashboard -w examples/pos-kiosk",
+    "backup": "node scripts/backup.js",
     "test": "node --test",
     "lint": "eslint ."
   },

@@ -16,6 +16,12 @@ export type Session = {
   createdAt: string;
 };
 
+export type ApiKeyRecord = {
+  key: string;
+  label: string;
+  createdAt: string;
+};
+
 export class AuthService {
   #db: Database.Database;
 
@@ -28,6 +34,14 @@ export class AuthService {
 
   createUser(email: string, password: string): Omit<Identity, "passwordHash"> {
     const normalized = email.trim().toLowerCase();
+    if (!normalized.includes("@")) {
+      throw new Error("Email address is invalid");
+    }
+
+    if (password.length < 10) {
+      throw new Error("Password must be at least 10 characters");
+    }
+
     if (this.#findUserByEmail(normalized)) {
       throw new Error("Email already exists");
     }
@@ -69,6 +83,11 @@ export class AuthService {
     this.#db.prepare("delete from sessions where token = ?").run(token);
   }
 
+  getSession(token: string): Session | null {
+    const row = this.#db.prepare("select * from sessions where token = ?").get(token);
+    return row ? mapSession(row) : null;
+  }
+
   listUsers(): Array<Omit<Identity, "passwordHash">> {
     return this.#db
       .prepare("select * from identities order by created_at desc")
@@ -83,6 +102,28 @@ export class AuthService {
       .run(key, label, new Date().toISOString());
 
     return { label, key };
+  }
+
+  validateApiKey(key: string): boolean {
+    return Boolean(this.#db.prepare("select key from api_keys where key = ?").get(key));
+  }
+
+  listApiKeys(): Array<Omit<ApiKeyRecord, "key">> {
+    return this.#db
+      .prepare("select label, created_at from api_keys order by created_at desc")
+      .all()
+      .map((row) => {
+        const record = row as { label: string; created_at: string };
+        return {
+          label: record.label,
+          createdAt: record.created_at
+        };
+      });
+  }
+
+  userCount(): number {
+    const row = this.#db.prepare("select count(*) as count from identities").get() as { count: number };
+    return row.count;
   }
 
   #findUserByEmail(email: string): Identity | null {
@@ -146,6 +187,20 @@ function mapIdentity(row: unknown): Identity {
     id: record.id,
     email: record.email,
     passwordHash: record.password_hash,
+    createdAt: record.created_at
+  };
+}
+
+function mapSession(row: unknown): Session {
+  const record = row as {
+    token: string;
+    user_id: string;
+    created_at: string;
+  };
+
+  return {
+    token: record.token,
+    userId: record.user_id,
     createdAt: record.created_at
   };
 }

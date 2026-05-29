@@ -20,7 +20,10 @@ export default [
         console: "readonly",
         document: "readonly",
         fetch: "readonly",
+        localStorage: "readonly",
         process: "readonly",
+        setTimeout: "readonly",
+        URL: "readonly",
         WebSocket: "readonly"
       }
     },

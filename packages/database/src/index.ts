@@ -121,6 +121,50 @@ export class CollectionStore {
     };
   }
 
+  importSnapshot(snapshot: { documents?: unknown[] }): number {
+    const documents = snapshot.documents ?? [];
+    const insert = this.#db.prepare(`
+      insert into documents (id, collection, data, revision, created_at, updated_at, deleted_at)
+      values (?, ?, ?, ?, ?, ?, ?)
+      on conflict(collection, id) do update set
+        data = excluded.data,
+        revision = excluded.revision,
+        created_at = excluded.created_at,
+        updated_at = excluded.updated_at,
+        deleted_at = excluded.deleted_at
+    `);
+
+    const transaction = this.#db.transaction((rows: unknown[]) => {
+      for (const row of rows) {
+        const record = row as {
+          id: string;
+          collection: string;
+          data: string | unknown;
+          revision?: number;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+          createdAt?: string;
+          updatedAt?: string;
+          deletedAt?: string | null;
+        };
+        const now = new Date().toISOString();
+        insert.run(
+          record.id,
+          record.collection,
+          typeof record.data === "string" ? record.data : JSON.stringify(record.data),
+          record.revision ?? 1,
+          record.created_at ?? record.createdAt ?? now,
+          record.updated_at ?? record.updatedAt ?? now,
+          record.deleted_at ?? record.deletedAt ?? null
+        );
+      }
+    });
+
+    transaction(documents);
+    return documents.length;
+  }
+
   #migrate(): void {
     this.#db.exec(`
       create table if not exists documents (

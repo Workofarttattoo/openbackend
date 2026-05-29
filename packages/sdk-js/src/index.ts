@@ -1,5 +1,7 @@
 export type OpenBackendOptions = {
   url: string;
+  token?: string;
+  apiKey?: string;
 };
 
 export type DocumentRecord<T = unknown> = {
@@ -13,26 +15,31 @@ export type DocumentRecord<T = unknown> = {
 };
 
 export function createOpenBackend(options: OpenBackendOptions): OpenBackendClient {
-  return new OpenBackendClient(options.url);
+  return new OpenBackendClient(options);
 }
 
 export class OpenBackendClient {
   #url: string;
+  #auth: AuthHeaders;
 
-  constructor(url: string) {
-    this.#url = url.replace(/\/$/, "");
+  constructor(options: OpenBackendOptions) {
+    this.#url = options.url.replace(/\/$/, "");
+    this.#auth = {
+      token: options.token,
+      apiKey: options.apiKey
+    };
   }
 
   database(): DatabaseClient {
-    return new DatabaseClient(this.#url);
+    return new DatabaseClient(this.#url, this.#auth);
   }
 
   auth(): AuthClient {
-    return new AuthClient(this.#url);
+    return new AuthClient(this.#url, this.#auth);
   }
 
   storage(): StorageClient {
-    return new StorageClient(this.#url);
+    return new StorageClient(this.#url, this.#auth);
   }
 
   functions(): FunctionsClient {
@@ -42,47 +49,51 @@ export class OpenBackendClient {
 
 export class DatabaseClient {
   #url: string;
+  #auth: AuthHeaders;
 
-  constructor(url: string) {
+  constructor(url: string, auth: AuthHeaders) {
     this.#url = url;
+    this.#auth = auth;
   }
 
   collection<T = unknown>(name: string): CollectionClient<T> {
-    return new CollectionClient<T>(this.#url, name);
+    return new CollectionClient<T>(this.#url, name, this.#auth);
   }
 }
 
 export class CollectionClient<T = unknown> {
   #url: string;
   #name: string;
+  #auth: AuthHeaders;
 
-  constructor(url: string, name: string) {
+  constructor(url: string, name: string, auth: AuthHeaders) {
     this.#url = url;
     this.#name = name;
+    this.#auth = auth;
   }
 
   async list(): Promise<Array<DocumentRecord<T>>> {
-    return request(`${this.#url}/api/collections/${this.#name}/documents`);
+    return request(`${this.#url}/api/collections/${this.#name}/documents`, {}, this.#auth);
   }
 
   async create(data: T): Promise<DocumentRecord<T>> {
     return request(`${this.#url}/api/collections/${this.#name}/documents`, {
       method: "POST",
       body: JSON.stringify({ data })
-    });
+    }, this.#auth);
   }
 
   async update(id: string, patch: Partial<T>): Promise<DocumentRecord<T>> {
     return request(`${this.#url}/api/collections/${this.#name}/documents/${id}`, {
       method: "PATCH",
       body: JSON.stringify({ data: patch })
-    });
+    }, this.#auth);
   }
 
   async remove(id: string): Promise<DocumentRecord<T>> {
     return request(`${this.#url}/api/collections/${this.#name}/documents/${id}`, {
       method: "DELETE"
-    });
+    }, this.#auth);
   }
 
   watch(callback: (items: Array<DocumentRecord<T>>) => void): () => void {
@@ -114,16 +125,18 @@ export class CollectionClient<T = unknown> {
 
 export class AuthClient {
   #url: string;
+  #auth: AuthHeaders;
 
-  constructor(url: string) {
+  constructor(url: string, auth: AuthHeaders) {
     this.#url = url;
+    this.#auth = auth;
   }
 
   createUser(email: string, password: string): Promise<unknown> {
-    return request(`${this.#url}/api/auth/users`, {
+    return request(`${this.#url}/api/admin/auth/users`, {
       method: "POST",
       body: JSON.stringify({ email, password })
-    });
+    }, this.#auth);
   }
 
   login(email: string, password: string): Promise<unknown> {
@@ -132,20 +145,33 @@ export class AuthClient {
       body: JSON.stringify({ email, password })
     });
   }
+
+  bootstrap(email: string, password: string): Promise<unknown> {
+    return request(`${this.#url}/api/auth/bootstrap`, {
+      method: "POST",
+      body: JSON.stringify({ email, password })
+    });
+  }
+
+  bootstrapStatus(): Promise<{ required: boolean }> {
+    return request(`${this.#url}/api/auth/bootstrap`);
+  }
 }
 
 export class StorageClient {
   #url: string;
+  #auth: AuthHeaders;
 
-  constructor(url: string) {
+  constructor(url: string, auth: AuthHeaders) {
     this.#url = url;
+    this.#auth = auth;
   }
 
   upload(name: string, data: string, contentType = "text/plain"): Promise<unknown> {
     return request(`${this.#url}/api/files`, {
       method: "POST",
       body: JSON.stringify({ name, data, contentType, encoding: "utf8" })
-    });
+    }, this.#auth);
   }
 }
 
@@ -164,11 +190,17 @@ export class FunctionsClient {
   }
 }
 
-async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
+type AuthHeaders = {
+  token?: string;
+  apiKey?: string;
+};
+
+async function request<T>(url: string, init: RequestInit = {}, auth: AuthHeaders = {}): Promise<T> {
   const response = await fetch(url, {
     ...init,
     headers: {
       "content-type": "application/json",
+      ...authHeaders(auth),
       ...init.headers
     }
   });
@@ -180,3 +212,15 @@ async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+function authHeaders(auth: AuthHeaders): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (auth.token) {
+    headers.authorization = `Bearer ${auth.token}`;
+  }
+
+  if (auth.apiKey) {
+    headers["x-openbackend-api-key"] = auth.apiKey;
+  }
+
+  return headers;
+}

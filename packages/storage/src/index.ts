@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
+import Database from "better-sqlite3";
 
 export type StoredObject = {
   id: string;
@@ -13,11 +14,15 @@ export type StoredObject = {
 
 export class LocalObjectStorage {
   #root: string;
-  #objects = new Map<string, StoredObject>();
+  #db: Database.Database;
 
-  constructor(root: string) {
+  constructor(root: string, metadataPath: string) {
     this.#root = root;
     mkdirSync(root, { recursive: true });
+    mkdirSync(dirname(metadataPath), { recursive: true });
+    this.#db = new Database(metadataPath);
+    this.#db.pragma("journal_mode = WAL");
+    this.#migrate();
   }
 
   put(input: { name: string; contentType?: string; data: Buffer }): StoredObject {
@@ -36,16 +41,25 @@ export class LocalObjectStorage {
       createdAt: new Date().toISOString()
     };
 
-    this.#objects.set(id, object);
+    this.#db
+      .prepare(
+        "insert into objects (id, name, path, size, content_type, created_at) values (?, ?, ?, ?, ?, ?)"
+      )
+      .run(object.id, object.name, object.path, object.size, object.contentType, object.createdAt);
+
     return object;
   }
 
   list(): StoredObject[] {
-    return [...this.#objects.values()];
+    return this.#db
+      .prepare("select * from objects order by created_at desc")
+      .all()
+      .map(mapObject);
   }
 
   get(id: string): { object: StoredObject; data: Buffer } | null {
-    const object = this.#objects.get(id);
+    const row = this.#db.prepare("select * from objects where id = ?").get(id);
+    const object = row ? mapObject(row) : null;
     if (!object) {
       return null;
     }
@@ -55,4 +69,41 @@ export class LocalObjectStorage {
       data: readFileSync(object.path)
     };
   }
+
+  exportMetadata(): unknown[] {
+    return this.#db.prepare("select * from objects order by created_at desc").all();
+  }
+
+  #migrate(): void {
+    this.#db.exec(`
+      create table if not exists objects (
+        id text primary key,
+        name text not null,
+        path text not null,
+        size integer not null,
+        content_type text not null,
+        created_at text not null
+      );
+    `);
+  }
+}
+
+function mapObject(row: unknown): StoredObject {
+  const record = row as {
+    id: string;
+    name: string;
+    path: string;
+    size: number;
+    content_type: string;
+    created_at: string;
+  };
+
+  return {
+    id: record.id,
+    name: record.name,
+    path: record.path,
+    size: record.size,
+    contentType: record.content_type,
+    createdAt: record.created_at
+  };
 }
