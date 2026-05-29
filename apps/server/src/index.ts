@@ -28,11 +28,14 @@ const realtime = new RealtimeHub({
 });
 const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
 
-functions.register("hello", ({ body }) => ({
-  ok: true,
-  message: "Hello from a local OpenBackend function.",
-  input: body
-}));
+functions.registerIsolated(
+  "hello",
+  `(async (context) => ({
+    ok: true,
+    message: "Hello from an isolated local OpenBackend function.",
+    input: context.body
+  }))`
+);
 
 const app = new Hono();
 

@@ -12,7 +12,7 @@ OpenBackend is ready for private self-hosted alpha testing.
 - Protected admin routes and protected write APIs by default.
 - Optional authenticated realtime sockets.
 - Basic IP rate limiting.
-- Local function timeout controls.
+- Local function timeout controls and worker-isolated function registration.
 - Filesystem storage with persistent metadata, download, and delete.
 - Local functions with protected run calls.
 - Dashboard login/bootstrap, collection create, API-key creation, import, export, and file delete.
@@ -32,7 +32,7 @@ OpenBackend is ready for private self-hosted alpha testing.
 ## Not Yet Public-Production Ready
 
 - Field-level permission rules.
-- Worker/thread function isolation.
+- Stronger function sandbox policies and resource quotas.
 - PostgreSQL and MinIO adapters wired into runtime behavior.
 - Dedicated brute-force login protection.
 - Full restore verification test with live data.
