@@ -33,7 +33,10 @@ function WebsiteExample() {
   const writePosts = useMemo(() => writeApp.database().collection<Post>("website_posts"), [writeApp]);
   const messages = useMemo(() => writeApp.database().collection<ContactMessage>("contact_messages"), [writeApp]);
 
-  useEffect(() => publicPosts.watch(setPosts), [publicPosts]);
+  useEffect(() => {
+    const watchedPosts = apiKey ? writePosts : publicPosts;
+    return watchedPosts.watch(setPosts);
+  }, [apiKey, publicPosts, writePosts]);
 
   const publishPost = async () => {
     rememberApiKey(apiKey);
@@ -130,4 +133,3 @@ function rememberApiKey(apiKey: string): void {
 }
 
 createRoot(document.getElementById("root") as HTMLElement).render(<WebsiteExample />);
-

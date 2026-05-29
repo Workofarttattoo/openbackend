@@ -10,11 +10,24 @@ export type RealtimeEvent = {
 export class RealtimeHub {
   #server?: WebSocketServer;
   #subscriptions = new Map<WebSocket, Set<string>>();
+  #authorize: (token: string | null, apiKey: string | null) => boolean;
+
+  constructor(options: { authorize?: (token: string | null, apiKey: string | null) => boolean } = {}) {
+    this.#authorize = options.authorize ?? (() => true);
+  }
 
   attach(server: Server): void {
     this.#server = new WebSocketServer({ server, path: "/realtime" });
 
-    this.#server.on("connection", (socket) => {
+    this.#server.on("connection", (socket, request) => {
+      const url = new URL(request.url ?? "/realtime", "http://localhost");
+      const token = url.searchParams.get("token");
+      const apiKey = url.searchParams.get("apiKey");
+      if (!this.#authorize(token, apiKey)) {
+        socket.close(1008, "Realtime authorization required");
+        return;
+      }
+
       this.#subscriptions.set(socket, new Set());
 
       socket.on("message", (raw) => {
@@ -40,4 +53,3 @@ export class RealtimeHub {
     }
   }
 }
-

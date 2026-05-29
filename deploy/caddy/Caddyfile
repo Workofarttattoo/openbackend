@@ -1,0 +1,10 @@
+{
+  email {$TLS_EMAIL}
+}
+
+{$OPENBACKEND_DOMAIN} {
+  encode zstd gzip
+
+  reverse_proxy openbackend:8787
+}
+

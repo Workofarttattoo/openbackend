@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
+import WebSocket from "ws";
 
 const port = 8791;
 const baseUrl = `http://127.0.0.1:${port}`;
@@ -46,6 +47,7 @@ describe("server deploy smoke", () => {
 
     const users = await get("/api/admin/auth/users", token);
     assert.equal(users.length, 1);
+    assert.equal(users[0].role, "admin");
   });
 
   it("persists files, creates API keys, and exports data", async () => {
@@ -74,6 +76,11 @@ describe("server deploy smoke", () => {
 
     const apiKey = await post("/api/admin/auth/api-keys", { label: "smoke" }, token);
     assert.match(apiKey.key, /^ob_/);
+
+    const deniedAdmin = await fetch(`${baseUrl}/api/admin/auth/users`, {
+      headers: { "x-openbackend-api-key": apiKey.key }
+    });
+    assert.equal(deniedAdmin.status, 401);
 
     const apiKeyWrite = await fetch(`${baseUrl}/api/collections/products/documents`, {
       method: "POST",
@@ -121,6 +128,18 @@ describe("server deploy smoke", () => {
     const settings = await get("/api/collections/settings/documents", token);
     assert.equal(settings[0].data.mode, "local");
   });
+
+  it("requires auth for realtime sockets", async () => {
+    const denied = await socketCloseCode(`${baseUrl.replace("http", "ws")}/realtime`);
+    assert.equal(denied, 1008);
+
+    const allowed = new WebSocket(`${baseUrl.replace("http", "ws")}/realtime?token=${token}`);
+    await new Promise((resolve, reject) => {
+      allowed.once("open", resolve);
+      allowed.once("error", reject);
+    });
+    allowed.close();
+  });
 });
 
 async function waitForHealth() {
@@ -164,4 +183,12 @@ async function post(path, body, sessionToken) {
   }
 
   return response.json();
+}
+
+async function socketCloseCode(url) {
+  const socket = new WebSocket(url);
+  return new Promise((resolve, reject) => {
+    socket.once("close", (code) => resolve(code));
+    socket.once("error", reject);
+  });
 }

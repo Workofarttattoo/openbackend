@@ -7,6 +7,11 @@ export type LocalFunction = (context: FunctionContext) => unknown | Promise<unkn
 
 export class FunctionRegistry {
   #functions = new Map<string, LocalFunction>();
+  #timeoutMs: number;
+
+  constructor(options: { timeoutMs?: number } = {}) {
+    this.#timeoutMs = options.timeoutMs ?? 5000;
+  }
 
   register(name: string, fn: LocalFunction): void {
     this.#functions.set(name, fn);
@@ -22,7 +27,11 @@ export class FunctionRegistry {
       throw new Error(`Function not found: ${name}`);
     }
 
-    return fn(context);
+    return Promise.race([
+      fn(context),
+      new Promise((_resolve, reject) => {
+        setTimeout(() => reject(new Error(`Function timed out after ${this.#timeoutMs}ms`)), this.#timeoutMs);
+      })
+    ]);
   }
 }
-

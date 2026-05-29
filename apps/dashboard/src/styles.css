@@ -13,7 +13,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -176,7 +177,8 @@ label.wide {
   min-width: 320px;
 }
 
-input {
+input,
+select {
   height: 38px;
   border: 1px solid #cfd8d0;
   border-radius: 8px;

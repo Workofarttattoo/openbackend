@@ -6,6 +6,7 @@ import Database from "better-sqlite3";
 export type Identity = {
   id: string;
   email: string;
+  role: AuthRole;
   passwordHash: string;
   createdAt: string;
 };
@@ -20,7 +21,16 @@ export type Session = {
 export type ApiKeyRecord = {
   key: string;
   label: string;
+  role: AuthRole;
   createdAt: string;
+};
+
+export type AuthRole = "admin" | "editor" | "viewer" | "device";
+
+export type Principal = {
+  type: "session" | "apiKey";
+  id: string;
+  role: AuthRole;
 };
 
 export class AuthService {
@@ -35,7 +45,7 @@ export class AuthService {
     this.#migrate();
   }
 
-  createUser(email: string, password: string): Omit<Identity, "passwordHash"> {
+  createUser(email: string, password: string, role: AuthRole = "editor"): Omit<Identity, "passwordHash"> {
     const normalized = email.trim().toLowerCase();
     if (!normalized.includes("@")) {
       throw new Error("Email address is invalid");
@@ -52,13 +62,14 @@ export class AuthService {
     const user = {
       id: randomUUID(),
       email: normalized,
+      role,
       passwordHash: hashPassword(password),
       createdAt: new Date().toISOString()
     };
 
     this.#db
-      .prepare("insert into identities (id, email, password_hash, created_at) values (?, ?, ?, ?)")
-      .run(user.id, user.email, user.passwordHash, user.createdAt);
+      .prepare("insert into identities (id, email, role, password_hash, created_at) values (?, ?, ?, ?, ?)")
+      .run(user.id, user.email, user.role, user.passwordHash, user.createdAt);
 
     return stripSecret(user);
   }
@@ -102,6 +113,25 @@ export class AuthService {
     return session;
   }
 
+  getPrincipalFromSession(token: string): Principal | null {
+    const session = this.getSession(token);
+    if (!session) {
+      return null;
+    }
+
+    const row = this.#db.prepare("select id, role from identities where id = ?").get(session.userId);
+    if (!row) {
+      return null;
+    }
+
+    const record = row as { id: string; role: AuthRole };
+    return {
+      type: "session",
+      id: record.id,
+      role: record.role
+    };
+  }
+
   listUsers(): Array<Omit<Identity, "passwordHash">> {
     return this.#db
       .prepare("select * from identities order by created_at desc")
@@ -109,27 +139,42 @@ export class AuthService {
       .map((row) => stripSecret(mapIdentity(row)));
   }
 
-  createApiKey(label: string): { label: string; key: string } {
+  createApiKey(label: string, role: AuthRole = "device"): { label: string; key: string; role: AuthRole } {
     const key = `ob_${randomBytes(24).toString("hex")}`;
     this.#db
-      .prepare("insert into api_keys (key, label, created_at) values (?, ?, ?)")
-      .run(key, label, new Date().toISOString());
+      .prepare("insert into api_keys (key, label, role, created_at) values (?, ?, ?, ?)")
+      .run(key, label, role, new Date().toISOString());
 
-    return { label, key };
+    return { label, key, role };
   }
 
   validateApiKey(key: string): boolean {
     return Boolean(this.#db.prepare("select key from api_keys where key = ?").get(key));
   }
 
+  getPrincipalFromApiKey(key: string): Principal | null {
+    const row = this.#db.prepare("select key, role from api_keys where key = ?").get(key);
+    if (!row) {
+      return null;
+    }
+
+    const record = row as { key: string; role: AuthRole };
+    return {
+      type: "apiKey",
+      id: record.key,
+      role: record.role
+    };
+  }
+
   listApiKeys(): Array<Omit<ApiKeyRecord, "key">> {
     return this.#db
-      .prepare("select label, created_at from api_keys order by created_at desc")
+      .prepare("select label, role, created_at from api_keys order by created_at desc")
       .all()
       .map((row) => {
-        const record = row as { label: string; created_at: string };
+        const record = row as { label: string; role: AuthRole; created_at: string };
         return {
           label: record.label,
+          role: record.role,
           createdAt: record.created_at
         };
       });
@@ -150,6 +195,7 @@ export class AuthService {
       create table if not exists identities (
         id text primary key,
         email text not null unique,
+        role text not null default 'editor',
         password_hash text not null,
         created_at text not null
       );
@@ -164,14 +210,25 @@ export class AuthService {
       create table if not exists api_keys (
         key text primary key,
         label text not null,
+        role text not null default 'device',
         created_at text not null
       );
     `);
+
+    const identityColumns = this.#db.prepare("pragma table_info(identities)").all() as Array<{ name: string }>;
+    if (!identityColumns.some((column) => column.name === "role")) {
+      this.#db.exec("alter table identities add column role text not null default 'editor'");
+    }
 
     const sessionColumns = this.#db.prepare("pragma table_info(sessions)").all() as Array<{ name: string }>;
     if (!sessionColumns.some((column) => column.name === "expires_at")) {
       const expiresAt = new Date(Date.now() + this.#sessionTtlMs).toISOString();
       this.#db.exec(`alter table sessions add column expires_at text not null default '${expiresAt}'`);
+    }
+
+    const apiKeyColumns = this.#db.prepare("pragma table_info(api_keys)").all() as Array<{ name: string }>;
+    if (!apiKeyColumns.some((column) => column.name === "role")) {
+      this.#db.exec("alter table api_keys add column role text not null default 'device'");
     }
   }
 }
@@ -192,6 +249,7 @@ function stripSecret(user: Identity): Omit<Identity, "passwordHash"> {
   return {
     id: user.id,
     email: user.email,
+    role: user.role,
     createdAt: user.createdAt
   };
 }
@@ -200,6 +258,7 @@ function mapIdentity(row: unknown): Identity {
   const record = row as {
     id: string;
     email: string;
+    role: AuthRole;
     password_hash: string;
     created_at: string;
   };
@@ -207,6 +266,7 @@ function mapIdentity(row: unknown): Identity {
   return {
     id: record.id,
     email: record.email,
+    role: record.role,
     passwordHash: record.password_hash,
     createdAt: record.created_at
   };

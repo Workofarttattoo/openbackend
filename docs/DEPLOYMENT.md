@@ -68,6 +68,10 @@ docker compose --profile vps up --build -d
 | `OPENBACKEND_MAX_UPLOAD_BYTES` | Maximum JSON upload payload size |
 | `OPENBACKEND_BACKUP_DIR` | Destination for local backup snapshots |
 | `OPENBACKEND_SESSION_TTL_HOURS` | Session lifetime in hours |
+| `OPENBACKEND_RATE_LIMIT_WINDOW_MS` | Rate limit window in milliseconds |
+| `OPENBACKEND_RATE_LIMIT_MAX` | Max requests per window per client IP |
+| `OPENBACKEND_FUNCTION_TIMEOUT_MS` | Local function timeout in milliseconds |
+| `OPENBACKEND_REQUIRE_REALTIME_AUTH` | Require token/API key for WebSocket watches |
 | `MINIO_ROOT_USER` | Optional MinIO admin user for NAS/VPS profile |
 | `MINIO_ROOT_PASSWORD` | Optional MinIO admin password for NAS/VPS profile |
 | `POSTGRES_DB` | Optional PostgreSQL database for VPS profile |
@@ -82,6 +86,15 @@ docker compose --profile vps up --build -d
 - No required proprietary runtime.
 - Scale-up services are self-hosted open-source containers.
 - Operators can run on a laptop, kiosk box, NAS, Raspberry Pi-class host, or VPS they already control.
+
+## TLS Reverse Proxy Templates
+
+Starter templates live in:
+
+- `deploy/caddy/Caddyfile`
+- `deploy/nginx/openbackend.conf`
+
+Use Caddy for automatic certificates on a VPS, or Nginx behind your existing certificate automation. OpenBackend itself remains a plain local HTTP service behind the proxy.
 
 ## First Admin
 

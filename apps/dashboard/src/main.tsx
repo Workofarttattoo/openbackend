@@ -18,7 +18,9 @@ function App() {
   const [draft, setDraft] = useState('{"name":"Coffee","price":4.5}');
   const [userEmail, setUserEmail] = useState("owner@example.local");
   const [userPassword, setUserPassword] = useState("change-me-now");
+  const [userRole, setUserRole] = useState("editor");
   const [apiKeyLabel, setApiKeyLabel] = useState("pos-kiosk");
+  const [apiKeyRole, setApiKeyRole] = useState("device");
   const [newApiKey, setNewApiKey] = useState("");
   const [importJson, setImportJson] = useState("");
   const [status, setStatus] = useState("Ready");
@@ -63,13 +65,16 @@ function App() {
   };
 
   const createUser = async () => {
-    await client.auth().createUser(userEmail, userPassword);
+    await postJson("/api/admin/auth/users", { email: userEmail, password: userPassword, role: userRole }, token);
     setStatus("User created");
     await refresh();
   };
 
   const createApiKey = async () => {
-    const result = await postJson<{ key: string }>("/api/admin/auth/api-keys", { label: apiKeyLabel }, token);
+    const result = await postJson<{ key: string }>("/api/admin/auth/api-keys", {
+      label: apiKeyLabel,
+      role: apiKeyRole
+    }, token);
     setNewApiKey(result.key);
     setStatus("API key created");
     await refresh();
@@ -195,6 +200,14 @@ function App() {
               type="password"
             />
           </label>
+          <label>
+            Role
+            <select value={userRole} onChange={(event) => setUserRole(event.target.value)}>
+              <option value="editor">editor</option>
+              <option value="viewer">viewer</option>
+              <option value="admin">admin</option>
+            </select>
+          </label>
           <button onClick={createUser}><Plus size={18} /> User</button>
         </section>
 
@@ -202,6 +215,14 @@ function App() {
           <label>
             API key label
             <input value={apiKeyLabel} onChange={(event) => setApiKeyLabel(event.target.value)} />
+          </label>
+          <label>
+            Role
+            <select value={apiKeyRole} onChange={(event) => setApiKeyRole(event.target.value)}>
+              <option value="device">device</option>
+              <option value="editor">editor</option>
+              <option value="viewer">viewer</option>
+            </select>
           </label>
           <button onClick={createApiKey}><Plus size={18} /> API Key</button>
           {newApiKey && <code className="secret-output">{newApiKey}</code>}

@@ -16,6 +16,10 @@ export type ServerConfig = {
   postgresUrl: string | null;
   s3Endpoint: string | null;
   s3Bucket: string;
+  rateLimitWindowMs: number;
+  rateLimitMax: number;
+  functionTimeoutMs: number;
+  requireRealtimeAuth: boolean;
 };
 
 export function loadConfig(env = process.env): ServerConfig {
@@ -36,7 +40,11 @@ export function loadConfig(env = process.env): ServerConfig {
     deploySize: parseDeploySize(env.OPENBACKEND_DEPLOY_SIZE ?? "local"),
     postgresUrl: env.OPENBACKEND_POSTGRES_URL || null,
     s3Endpoint: env.OPENBACKEND_S3_ENDPOINT || null,
-    s3Bucket: env.OPENBACKEND_S3_BUCKET ?? "openbackend"
+    s3Bucket: env.OPENBACKEND_S3_BUCKET ?? "openbackend",
+    rateLimitWindowMs: Number(env.OPENBACKEND_RATE_LIMIT_WINDOW_MS ?? "60000"),
+    rateLimitMax: Number(env.OPENBACKEND_RATE_LIMIT_MAX ?? "120"),
+    functionTimeoutMs: Number(env.OPENBACKEND_FUNCTION_TIMEOUT_MS ?? "5000"),
+    requireRealtimeAuth: env.OPENBACKEND_REQUIRE_REALTIME_AUTH !== "false"
   };
 }
 

@@ -8,8 +8,11 @@ OpenBackend is ready for private self-hosted alpha testing.
 - Local, NAS, and VPS compose profiles.
 - SQLite document collections.
 - WebSocket collection watches.
-- Self-hosted auth bootstrap, sessions, and API keys.
+- Self-hosted auth bootstrap, sessions, roles, and API keys.
 - Protected admin routes and protected write APIs by default.
+- Optional authenticated realtime sockets.
+- Basic IP rate limiting.
+- Local function timeout controls.
 - Filesystem storage with persistent metadata, download, and delete.
 - Local functions with protected run calls.
 - Dashboard login/bootstrap, collection create, API-key creation, import, export, and file delete.
@@ -28,12 +31,10 @@ OpenBackend is ready for private self-hosted alpha testing.
 
 ## Not Yet Public-Production Ready
 
-- Role-based permissions.
-- Function isolation/sandboxing.
-- HTTPS/TLS reverse proxy templates.
-- Authenticated realtime sockets.
+- Field-level permission rules.
+- Worker/thread function isolation.
 - PostgreSQL and MinIO adapters wired into runtime behavior.
-- Rate limiting and brute-force protection.
+- Dedicated brute-force login protection.
 - Full restore verification test with live data.
 
 ## Current Position
@@ -41,4 +42,3 @@ OpenBackend is ready for private self-hosted alpha testing.
 Private alpha deploy-ready: yes.
 
 Public internet production-ready: not yet.
-

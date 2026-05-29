@@ -136,7 +136,17 @@ export class CollectionClient<T = unknown> {
 
   watch(callback: (items: Array<DocumentRecord<T>>) => void): () => void {
     const socketUrl = this.#url.replace(/^http/, "ws");
-    const socket = new WebSocket(`${socketUrl}/realtime`);
+    const params = new URLSearchParams();
+    if (this.#auth.token) {
+      params.set("token", this.#auth.token);
+    }
+
+    if (this.#auth.apiKey) {
+      params.set("apiKey", this.#auth.apiKey);
+    }
+
+    const query = params.toString();
+    const socket = new WebSocket(`${socketUrl}/realtime${query ? `?${query}` : ""}`);
     let closed = false;
 
     const refresh = async () => {

@@ -2,7 +2,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { join } from "node:path";
-import { AuthService } from "@openbackend/auth";
+import { AuthService, type AuthRole, type Principal } from "@openbackend/auth";
 import { CollectionStore } from "@openbackend/database";
 import { FunctionRegistry } from "@openbackend/functions";
 import { RealtimeHub } from "@openbackend/realtime";
@@ -16,8 +16,17 @@ const auth = new AuthService(join(config.dataDir, "auth.sqlite"), {
   sessionTtlMs: config.sessionTtlHours * 60 * 60 * 1000
 });
 const storage = new LocalObjectStorage(join(config.dataDir, "files"), join(config.dataDir, "storage.sqlite"));
-const functions = new FunctionRegistry();
-const realtime = new RealtimeHub();
+const functions = new FunctionRegistry({ timeoutMs: config.functionTimeoutMs });
+const realtime = new RealtimeHub({
+  authorize: (token, apiKey) => {
+    if (!config.requireRealtimeAuth) {
+      return true;
+    }
+
+    return Boolean(resolvePrincipal(token ? `Bearer ${token}` : undefined, apiKey));
+  }
+});
+const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
 
 functions.register("hello", ({ body }) => ({
   ok: true,
@@ -45,8 +54,26 @@ app.onError((error, c) => {
   return c.json({ error: { message: error.message } }, status);
 });
 
+app.use(async (c, next) => {
+  const key = c.req.header("x-forwarded-for") ?? c.req.header("cf-connecting-ip") ?? "local";
+  const now = Date.now();
+  const bucket = rateLimitBuckets.get(key);
+  if (!bucket || bucket.resetAt <= now) {
+    rateLimitBuckets.set(key, { count: 1, resetAt: now + config.rateLimitWindowMs });
+    await next();
+    return;
+  }
+
+  bucket.count += 1;
+  if (bucket.count > config.rateLimitMax) {
+    return c.json({ error: { message: "Rate limit exceeded" } }, 429);
+  }
+
+  await next();
+});
+
 app.use("/api/admin/*", async (c, next) => {
-  if (!config.requireAuth || isAuthorized(c.req.header("authorization"), c.req.header("x-openbackend-api-key"))) {
+  if (!config.requireAuth || hasRole(c.req.header("authorization"), c.req.header("x-openbackend-api-key"), ["admin"])) {
     await next();
     return;
   }
@@ -60,7 +87,7 @@ app.use(async (c, next) => {
     return;
   }
 
-  if (isAuthorized(c.req.header("authorization"), c.req.header("x-openbackend-api-key"))) {
+  if (hasRole(c.req.header("authorization"), c.req.header("x-openbackend-api-key"), ["admin", "editor", "device"])) {
     await next();
     return;
   }
@@ -130,7 +157,7 @@ app.post("/api/auth/bootstrap", async (c) => {
   }
 
   const body = await c.req.json<{ email: string; password: string }>();
-  const user = auth.createUser(body.email, body.password);
+  const user = auth.createUser(body.email, body.password, "admin");
   const session = auth.login(body.email, body.password);
   audit("auth.bootstrap", { userId: user.id });
 
@@ -154,8 +181,8 @@ app.delete("/api/auth/sessions", (c) => {
 app.get("/api/admin/auth/users", (c) => c.json(auth.listUsers()));
 
 app.post("/api/admin/auth/users", async (c) => {
-  const body = await c.req.json<{ email: string; password: string }>();
-  const user = auth.createUser(body.email, body.password);
+  const body = await c.req.json<{ email: string; password: string; role?: AuthRole }>();
+  const user = auth.createUser(body.email, body.password, body.role ?? "editor");
   audit("auth.user.created", { userId: user.id });
   return c.json(user, 201);
 });
@@ -163,8 +190,8 @@ app.post("/api/admin/auth/users", async (c) => {
 app.get("/api/admin/auth/api-keys", (c) => c.json(auth.listApiKeys()));
 
 app.post("/api/admin/auth/api-keys", async (c) => {
-  const body = await c.req.json<{ label?: string }>();
-  const apiKey = auth.createApiKey(body.label ?? "default");
+  const body = await c.req.json<{ label?: string; role?: AuthRole }>();
+  const apiKey = auth.createApiKey(body.label ?? "default", body.role ?? "device");
   audit("auth.api_key.created", { label: apiKey.label });
   return c.json(apiKey, 201);
 });
@@ -267,13 +294,18 @@ realtime.attach(server as Parameters<typeof realtime.attach>[0]);
 
 console.log(`[info] OpenBackend server listening on http://${config.host}:${config.port}`);
 
-function isAuthorized(authorization: string | undefined, apiKey: string | undefined): boolean {
+function hasRole(authorization: string | undefined, apiKey: string | undefined, roles: AuthRole[]): boolean {
+  const principal = resolvePrincipal(authorization, apiKey);
+  return Boolean(principal && roles.includes(principal.role));
+}
+
+function resolvePrincipal(authorization: string | undefined, apiKey: string | null | undefined): Principal | null {
   const token = bearerToken(authorization);
   if (token && auth.getSession(token)) {
-    return true;
+    return auth.getPrincipalFromSession(token);
   }
 
-  return Boolean(apiKey && auth.validateApiKey(apiKey));
+  return apiKey ? auth.getPrincipalFromApiKey(apiKey) : null;
 }
 
 function bearerToken(authorization: string | undefined): string | null {
