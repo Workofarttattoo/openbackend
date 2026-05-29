@@ -2,7 +2,7 @@
 
 Firebase-style developer experience, open-source local-first implementation.
 
-OpenBackend is a clean-room, permissive backend platform for small apps, kiosks, POS systems, IoT dashboards, and internal tools. It is designed to run on a laptop, NAS, Raspberry Pi, or VPS with no mandatory cloud account and no paid service dependency.
+OpenBackend is a clean-room, permissive backend platform for website builds, small apps, kiosks, POS systems, IoT dashboards, and internal tools. It is designed to run on a laptop, NAS, Raspberry Pi, or VPS with no mandatory cloud account and no paid service dependency.
 
 ## Mission
 
@@ -34,6 +34,7 @@ See [docs/HOSTED_BACKEND_PARITY.md](docs/HOSTED_BACKEND_PARITY.md) for the clean
 See [docs/BMAD_BUILD_PLAN.md](docs/BMAD_BUILD_PLAN.md), [docs/MODULE_SCORECARD.md](docs/MODULE_SCORECARD.md), and [docs/DEPLOY_READINESS.md](docs/DEPLOY_READINESS.md) for project execution tracking.
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for local, NAS, and Docker deployment notes.
 See [docs/SCALE_PATH.md](docs/SCALE_PATH.md) for the no-fee scale-up path.
+See [docs/WEBSITE_BUILDS.md](docs/WEBSITE_BUILDS.md) for website build workflows.
 
 ## Quick Start
 
@@ -74,6 +75,12 @@ npm run deploy -- vps
 ```
 
 All deploy sizes are self-hosted and use permissive/open-source components. There are no mandatory payment gates, hosted accounts, or cloud fees.
+
+For website builds, start the example:
+
+```bash
+npm run dev:website
+```
 
 Before upgrades or experiments, create a local snapshot:
 

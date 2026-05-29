@@ -11,7 +11,7 @@ npm run deploy -- local
 - SQLite document database.
 - Local filesystem object storage.
 - Local function registry.
-- Best for laptops, kiosks, POS terminals, demos, and small internal tools.
+- Best for laptops, website builds, kiosks, POS terminals, demos, and small internal tools.
 
 ## Size 2: NAS
 
@@ -22,7 +22,7 @@ npm run deploy -- nas
 - OpenBackend service.
 - Optional MinIO container for S3-compatible object storage.
 - Persistent `./data` bind mount for easy backup to NAS/external drives.
-- Best for LAN apps, shared office tools, and small device fleets.
+- Best for client websites, LAN apps, shared office tools, and small device fleets.
 
 ## Size 3: VPS
 
@@ -42,4 +42,3 @@ npm run deploy -- vps
 - No mandatory subscription feature flags.
 - No paid tier gates in the open-source repo.
 - Paid hosting can exist later only as optional convenience, never as a dependency for core features.
-

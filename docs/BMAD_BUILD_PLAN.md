@@ -23,6 +23,7 @@ This project uses bMAD as an operating loop, not just a planning exercise.
 | Dashboard | Manage backend visually | React/Vite operational UI | Export/import and local admin controls |
 | SDK | Use backend from apps | TypeScript REST/WebSocket client | Migration helpers and offline writes |
 | DevOps | Self-host safely | Docker Compose, env config, backups | Laptop-to-NAS-to-VPS path |
+| Website builds | Content, forms, media, client portals | Website example and build guide | No-fee local backend for client sites |
 
 ## Current Execution Track
 

@@ -1,19 +1,25 @@
 # Website Backend Example
 
-This example shows how a small content site can use OpenBackend collections.
+This Vite example shows how OpenBackend can power website builds:
 
-```ts
-import { createOpenBackend } from "@openbackend/sdk-js";
+- Public content collection reads.
+- Live post preview with `watch`.
+- Contact form submissions.
+- Protected writes through a website API key.
 
-const app = createOpenBackend({ url: "http://localhost:8787" });
-const posts = app.database().collection("posts");
+## Run
 
-await posts.create({
-  title: "Launch note",
-  status: "published",
-  body: "OpenBackend is running locally."
-});
+Start OpenBackend first:
+
+```bash
+npm run deploy -- local
 ```
 
-Planned next step: add a static Vite site that watches the `posts` collection for live preview.
+Then run the website example:
+
+```bash
+npm run dev -w examples/website-backend
+```
+
+Create an API key in the dashboard and paste it into the site when submitting posts or contact messages.
 
