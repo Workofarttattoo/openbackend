@@ -18,6 +18,8 @@ This checklist gates the first self-hosted alpha.
 - [x] README deploy section.
 - [x] One-button deploy command.
 - [x] Scalable self-hosted deploy profiles.
+- [x] Docker profile smoke test commands for local, NAS, and VPS.
+- [x] Real-domain TLS smoke command and checklist.
 
 ## Should Do
 

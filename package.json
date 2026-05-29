@@ -18,6 +18,11 @@
     "stop": "node scripts/stop.js",
     "backup": "node scripts/backup.js",
     "restore": "node scripts/restore.js",
+    "smoke:docker": "node scripts/smoke-docker-profile.js local && node scripts/smoke-docker-profile.js nas && node scripts/smoke-docker-profile.js vps",
+    "smoke:docker:local": "node scripts/smoke-docker-profile.js local",
+    "smoke:docker:nas": "node scripts/smoke-docker-profile.js nas",
+    "smoke:docker:vps": "node scripts/smoke-docker-profile.js vps",
+    "smoke:tls": "node scripts/smoke-tls-domain.js",
     "test": "node --test",
     "lint": "eslint ."
   },

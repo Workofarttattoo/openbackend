@@ -122,6 +122,14 @@ Starter templates live in:
 
 Use Caddy for automatic certificates on a VPS, or Nginx behind your existing certificate automation. OpenBackend itself remains a plain local HTTP service behind the proxy.
 
+Run the real-domain TLS smoke after DNS points to the host:
+
+```bash
+OPENBACKEND_DOMAIN=backend.example.com npm run smoke:tls
+```
+
+See `docs/TLS_VALIDATION.md` for the full checklist.
+
 ## First Admin
 
 The first admin user should be created through the bootstrap endpoint or dashboard bootstrap flow. After at least one user exists, user creation moves behind protected admin APIs.

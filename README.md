@@ -36,6 +36,8 @@ See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for local, NAS, and Docker deployme
 See [docs/SCALE_PATH.md](docs/SCALE_PATH.md) for the no-fee scale-up path.
 See [docs/WEBSITE_BUILDS.md](docs/WEBSITE_BUILDS.md) for website build workflows.
 See [docs/ALPHA_READINESS.md](docs/ALPHA_READINESS.md) for what is ready now and what still gates public production.
+See [docs/DOCKER_PROFILE_SMOKE.md](docs/DOCKER_PROFILE_SMOKE.md) for local/NAS/VPS Docker profile smoke tests.
+See [docs/TLS_VALIDATION.md](docs/TLS_VALIDATION.md) for real-domain TLS validation.
 
 ## Quick Start
 

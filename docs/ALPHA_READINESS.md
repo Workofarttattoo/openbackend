@@ -21,6 +21,8 @@ OpenBackend is ready for private self-hosted alpha testing.
 - Website, POS/kiosk, and IoT starter examples.
 - Backup and restore scripts.
 - Server smoke tests.
+- Docker profile smoke test commands for local, NAS, and VPS.
+- Real-domain TLS validation script and checklist.
 
 ## Use For
 
