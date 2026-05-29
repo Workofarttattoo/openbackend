@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
+import type { AuthRole } from "@openbackend/auth";
 
 export type ServerConfig = {
   host: string;
@@ -13,13 +14,23 @@ export type ServerConfig = {
   backupDir: string;
   sessionTtlHours: number;
   deploySize: "local" | "nas" | "vps";
+  databaseDriver: "sqlite" | "postgres";
+  storageDriver: "filesystem" | "minio";
   postgresUrl: string | null;
   s3Endpoint: string | null;
   s3Bucket: string;
+  s3AccessKeyId: string | null;
+  s3SecretAccessKey: string | null;
   rateLimitWindowMs: number;
   rateLimitMax: number;
   functionTimeoutMs: number;
   requireRealtimeAuth: boolean;
+  collectionPermissions: Record<string, CollectionPermission>;
+};
+
+export type CollectionPermission = {
+  read?: AuthRole[];
+  write?: AuthRole[];
 };
 
 export function loadConfig(env = process.env): ServerConfig {
@@ -38,13 +49,18 @@ export function loadConfig(env = process.env): ServerConfig {
     backupDir: resolve(env.OPENBACKEND_BACKUP_DIR ?? "backups"),
     sessionTtlHours: Number(env.OPENBACKEND_SESSION_TTL_HOURS ?? "168"),
     deploySize: parseDeploySize(env.OPENBACKEND_DEPLOY_SIZE ?? "local"),
+    databaseDriver: parseDatabaseDriver(env.OPENBACKEND_DATABASE ?? (env.OPENBACKEND_POSTGRES_URL ? "postgres" : "sqlite")),
+    storageDriver: parseStorageDriver(env.OPENBACKEND_STORAGE ?? (env.OPENBACKEND_S3_ENDPOINT ? "minio" : "filesystem")),
     postgresUrl: env.OPENBACKEND_POSTGRES_URL || null,
     s3Endpoint: env.OPENBACKEND_S3_ENDPOINT || null,
     s3Bucket: env.OPENBACKEND_S3_BUCKET ?? "openbackend",
+    s3AccessKeyId: env.OPENBACKEND_S3_ACCESS_KEY_ID ?? env.MINIO_ROOT_USER ?? null,
+    s3SecretAccessKey: env.OPENBACKEND_S3_SECRET_ACCESS_KEY ?? env.MINIO_ROOT_PASSWORD ?? null,
     rateLimitWindowMs: Number(env.OPENBACKEND_RATE_LIMIT_WINDOW_MS ?? "60000"),
     rateLimitMax: Number(env.OPENBACKEND_RATE_LIMIT_MAX ?? "120"),
     functionTimeoutMs: Number(env.OPENBACKEND_FUNCTION_TIMEOUT_MS ?? "5000"),
-    requireRealtimeAuth: env.OPENBACKEND_REQUIRE_REALTIME_AUTH !== "false"
+    requireRealtimeAuth: env.OPENBACKEND_REQUIRE_REALTIME_AUTH !== "false",
+    collectionPermissions: parseCollectionPermissions(env.OPENBACKEND_COLLECTION_PERMISSIONS ?? "{}")
   };
 }
 
@@ -79,4 +95,37 @@ function parseDeploySize(value: string): "local" | "nas" | "vps" {
   }
 
   return "local";
+}
+
+function parseDatabaseDriver(value: string): "sqlite" | "postgres" {
+  return value === "postgres" ? "postgres" : "sqlite";
+}
+
+function parseStorageDriver(value: string): "filesystem" | "minio" {
+  return value === "minio" ? "minio" : "filesystem";
+}
+
+function parseCollectionPermissions(value: string): Record<string, CollectionPermission> {
+  try {
+    const parsed = JSON.parse(value) as Record<string, CollectionPermission>;
+    return Object.fromEntries(
+      Object.entries(parsed).map(([collection, permission]) => [
+        collection,
+        {
+          read: normalizeRoles(permission.read),
+          write: normalizeRoles(permission.write)
+        }
+      ])
+    );
+  } catch {
+    return {};
+  }
+}
+
+function normalizeRoles(roles: AuthRole[] | undefined): AuthRole[] | undefined {
+  if (!roles) {
+    return undefined;
+  }
+
+  return roles.filter((role) => ["admin", "editor", "viewer", "device"].includes(role));
 }

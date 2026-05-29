@@ -205,3 +205,5 @@ export class CollectionStore {
     };
   }
 }
+
+export * from "./adapters.js";

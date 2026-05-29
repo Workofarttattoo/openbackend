@@ -20,7 +20,13 @@ describe("server deploy smoke", () => {
         ...process.env,
         OPENBACKEND_PORT: String(port),
         OPENBACKEND_DATA_DIR: dataDir,
-        OPENBACKEND_REQUIRE_AUTH: "true"
+        OPENBACKEND_REQUIRE_AUTH: "true",
+        OPENBACKEND_COLLECTION_PERMISSIONS: JSON.stringify({
+          private_notes: {
+            read: ["admin", "viewer"],
+            write: ["admin"]
+          }
+        })
       },
       stdio: "ignore"
     });
@@ -127,6 +133,49 @@ describe("server deploy smoke", () => {
 
     const settings = await get("/api/collections/settings/documents", token);
     assert.equal(settings[0].data.mode, "local");
+  });
+
+  it("enforces collection-level permissions", async () => {
+    const viewerUser = await post(
+      "/api/admin/auth/users",
+      {
+        email: "viewer@example.local",
+        password: "viewer-pass",
+        role: "viewer"
+      },
+      token
+    );
+    assert.equal(viewerUser.role, "viewer");
+
+    await post(
+      "/api/collections/private_notes/documents",
+      {
+        data: {
+          note: "admin only write"
+        }
+      },
+      token
+    );
+
+    const anonymousRead = await fetch(`${baseUrl}/api/collections/private_notes/documents`);
+    assert.equal(anonymousRead.status, 401);
+
+    const viewerSession = await post("/api/auth/sessions", {
+      email: "viewer@example.local",
+      password: "viewer-pass"
+    });
+    const viewerRead = await get("/api/collections/private_notes/documents", viewerSession.token);
+    assert.equal(viewerRead.length, 1);
+
+    const viewerWrite = await fetch(`${baseUrl}/api/collections/private_notes/documents`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${viewerSession.token}`
+      },
+      body: JSON.stringify({ data: { note: "blocked" } })
+    });
+    assert.equal(viewerWrite.status, 401);
   });
 
   it("requires auth for realtime sockets", async () => {

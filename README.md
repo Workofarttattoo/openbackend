@@ -67,7 +67,7 @@ One-button Docker deploy:
 npm run deploy
 ```
 
-Scale up without changing platforms:
+Scale up without changing platforms or payment gates:
 
 ```bash
 npm run deploy -- local

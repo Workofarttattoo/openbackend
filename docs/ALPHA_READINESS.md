@@ -14,6 +14,8 @@ OpenBackend is ready for private self-hosted alpha testing.
 - Basic IP rate limiting.
 - Local function timeout controls and worker-isolated function registration.
 - Filesystem storage with persistent metadata, download, and delete.
+- Runtime PostgreSQL document adapter.
+- Runtime MinIO/S3-compatible object storage adapter.
 - Local functions with protected run calls.
 - Dashboard login/bootstrap, collection create, API-key creation, import, export, and file delete.
 - Website, POS/kiosk, and IoT starter examples.
@@ -33,7 +35,7 @@ OpenBackend is ready for private self-hosted alpha testing.
 
 - Field-level permission rules.
 - Stronger function sandbox policies and resource quotas.
-- PostgreSQL and MinIO adapters wired into runtime behavior.
+- Deeper PostgreSQL/MinIO operational testing under load.
 - Dedicated brute-force login protection.
 - Full restore verification test with live data.
 

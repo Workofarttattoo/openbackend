@@ -18,6 +18,17 @@ const env = {
   OPENBACKEND_DEPLOY_SIZE: requestedSize
 };
 
+if (requestedSize === "nas" || requestedSize === "vps") {
+  env.OPENBACKEND_STORAGE ??= "minio";
+  env.OPENBACKEND_S3_ENDPOINT ??= "http://minio:9000";
+  env.OPENBACKEND_S3_BUCKET ??= "openbackend";
+}
+
+if (requestedSize === "vps") {
+  env.OPENBACKEND_DATABASE ??= "postgres";
+  env.OPENBACKEND_POSTGRES_URL ??= "postgres://openbackend:change-this-postgres-password@postgres:5432/openbackend";
+}
+
 const args = ["compose"];
 if (requestedSize !== "local") {
   args.push("--profile", requestedSize);

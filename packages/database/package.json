@@ -9,10 +9,11 @@
     "test": "node --test"
   },
   "dependencies": {
-    "better-sqlite3": "^11.8.1"
+    "better-sqlite3": "^11.8.1",
+    "pg": "^8.13.1"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12"
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/pg": "^8.11.10"
   }
 }
-

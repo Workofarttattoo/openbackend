@@ -4,10 +4,10 @@ Use this scorecard to keep module quality visible as OpenBackend grows.
 
 | Module | MVP status | Deploy risk | Next hardening task |
 | --- | --- | --- | --- |
-| Database | CRUD, revisions, export/import | Medium | Conflict metadata and offline queue |
+| Database | SQLite/PostgreSQL CRUD, revisions, export/import | Medium | Conflict metadata and offline queue |
 | Realtime | Collection watch events with optional auth | Medium | Reconnect hints |
 | Auth | SQLite users/sessions/API keys, roles, and protected admin routes | Medium | Field-level permission rules |
-| Storage | Local disk writes with SQLite metadata | Medium | Delete support and MinIO adapter |
+| Storage | Filesystem and MinIO object storage | Medium | Multipart upload and retention policies |
 | Functions | Local HTTP trigger with audit logging, timeout, and worker isolation option | Medium | Strong sandbox policies and resource quotas |
 | Dashboard | Login/bootstrap and protected admin calls | Medium | Import UI and API-key management |
 | SDK | CRUD, auth, storage, functions, watch, auth headers | Medium | Migration helpers and offline queue |

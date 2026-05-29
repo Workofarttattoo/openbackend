@@ -3,19 +3,19 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { join } from "node:path";
 import { AuthService, type AuthRole, type Principal } from "@openbackend/auth";
-import { CollectionStore } from "@openbackend/database";
+import { CollectionStore, PostgresCollectionStore, type DatabaseAdapter } from "@openbackend/database";
 import { FunctionRegistry } from "@openbackend/functions";
 import { RealtimeHub } from "@openbackend/realtime";
-import { LocalObjectStorage } from "@openbackend/storage";
+import { LocalObjectStorage, S3CompatibleObjectStorage, type ObjectStorageAdapter } from "@openbackend/storage";
 import { loadConfig } from "./config.js";
 
 const config = loadConfig();
 
-const database = new CollectionStore(join(config.dataDir, "openbackend.sqlite"));
+const database: DatabaseAdapter = await createDatabase();
 const auth = new AuthService(join(config.dataDir, "auth.sqlite"), {
   sessionTtlMs: config.sessionTtlHours * 60 * 60 * 1000
 });
-const storage = new LocalObjectStorage(join(config.dataDir, "files"), join(config.dataDir, "storage.sqlite"));
+const storage: ObjectStorageAdapter = await createStorage();
 const functions = new FunctionRegistry({ timeoutMs: config.functionTimeoutMs });
 const realtime = new RealtimeHub({
   authorize: (token, apiKey) => {
@@ -103,20 +103,30 @@ app.get("/health", (c) => {
     ok: true,
     name: "openbackend",
     mode: config.deploySize,
-    storage: config.s3Endpoint ? "s3-compatible" : "filesystem",
-    database: config.postgresUrl ? "postgresql-configured" : "sqlite"
+    storage: config.storageDriver,
+    database: config.databaseDriver
   });
 });
 
-app.get("/api/collections", (c) => c.json(database.collections()));
+app.get("/api/collections", async (c) => c.json(await database.collections()));
 
-app.get("/api/collections/:collection/documents", (c) => {
-  return c.json(database.list(c.req.param("collection")));
+app.get("/api/collections/:collection/documents", async (c) => {
+  const collection = c.req.param("collection");
+  if (!canReadCollection(collection, c.req.header("authorization"), c.req.header("x-openbackend-api-key"))) {
+    return c.json({ error: { message: "Collection read authorization required" } }, 401);
+  }
+
+  return c.json(await database.list(collection));
 });
 
 app.post("/api/collections/:collection/documents", async (c) => {
+  const collection = c.req.param("collection");
+  if (!canWriteCollection(collection, c.req.header("authorization"), c.req.header("x-openbackend-api-key"))) {
+    return c.json({ error: { message: "Collection write authorization required" } }, 401);
+  }
+
   const body = await c.req.json<{ id?: string; data: unknown }>();
-  const change = database.create(c.req.param("collection"), body.data, body.id);
+  const change = await database.create(collection, body.data, body.id);
   audit("document.created", { collection: change.document.collection, id: change.document.id });
   realtime.publish({
     topic: `collections:${change.document.collection}`,
@@ -128,8 +138,13 @@ app.post("/api/collections/:collection/documents", async (c) => {
 });
 
 app.patch("/api/collections/:collection/documents/:id", async (c) => {
+  const collection = c.req.param("collection");
+  if (!canWriteCollection(collection, c.req.header("authorization"), c.req.header("x-openbackend-api-key"))) {
+    return c.json({ error: { message: "Collection write authorization required" } }, 401);
+  }
+
   const body = await c.req.json<{ data: Record<string, unknown> }>();
-  const change = database.update(c.req.param("collection"), c.req.param("id"), body.data);
+  const change = await database.update(collection, c.req.param("id"), body.data);
   audit("document.updated", { collection: change.document.collection, id: change.document.id });
   realtime.publish({
     topic: `collections:${change.document.collection}`,
@@ -140,8 +155,13 @@ app.patch("/api/collections/:collection/documents/:id", async (c) => {
   return c.json(change.document);
 });
 
-app.delete("/api/collections/:collection/documents/:id", (c) => {
-  const change = database.delete(c.req.param("collection"), c.req.param("id"));
+app.delete("/api/collections/:collection/documents/:id", async (c) => {
+  const collection = c.req.param("collection");
+  if (!canWriteCollection(collection, c.req.header("authorization"), c.req.header("x-openbackend-api-key"))) {
+    return c.json({ error: { message: "Collection write authorization required" } }, 401);
+  }
+
+  const change = await database.delete(collection, c.req.param("id"));
   audit("document.deleted", { collection: change.document.collection, id: change.document.id });
   realtime.publish({
     topic: `collections:${change.document.collection}`,
@@ -211,7 +231,7 @@ app.post("/api/files", async (c) => {
     contentType?: string;
     encoding?: BufferEncoding;
   }>();
-  const object = storage.put({
+  const object = await storage.put({
     name: body.name,
     contentType: body.contentType,
     data: Buffer.from(body.data, body.encoding ?? "base64")
@@ -227,10 +247,10 @@ app.post("/api/files", async (c) => {
   return c.json(object, 201);
 });
 
-app.get("/api/files", (c) => c.json(storage.list()));
+app.get("/api/files", async (c) => c.json(await storage.list()));
 
-app.get("/api/files/:id", (c) => {
-  const found = storage.get(c.req.param("id"));
+app.get("/api/files/:id", async (c) => {
+  const found = await storage.get(c.req.param("id"));
   if (!found) {
     return c.text("File not found", 404);
   }
@@ -246,8 +266,8 @@ app.get("/api/files/:id", (c) => {
   });
 });
 
-app.delete("/api/files/:id", (c) => {
-  const object = storage.delete(c.req.param("id"));
+app.delete("/api/files/:id", async (c) => {
+  const object = await storage.delete(c.req.param("id"));
   audit("file.deleted", { id: object.id, name: object.name });
   realtime.publish({
     topic: "files",
@@ -268,19 +288,19 @@ app.post("/api/functions/:name", async (c) => {
   return c.json(result);
 });
 
-app.get("/api/admin/export", (c) => {
+app.get("/api/admin/export", async (c) => {
   return c.json({
     exportedAt: new Date().toISOString(),
-    database: database.exportSnapshot(),
+    database: await database.exportSnapshot(),
     storage: {
-      objects: storage.exportMetadata()
+      objects: await storage.exportMetadata()
     }
   });
 });
 
 app.post("/api/admin/import", async (c) => {
   const body = await c.req.json<{ database?: { documents?: unknown[] } }>();
-  const importedDocuments = body.database ? database.importSnapshot(body.database) : 0;
+  const importedDocuments = body.database ? await database.importSnapshot(body.database) : 0;
   audit("data.imported", { importedDocuments });
   return c.json({ importedDocuments });
 });
@@ -300,6 +320,24 @@ console.log(`[info] OpenBackend server listening on http://${config.host}:${conf
 function hasRole(authorization: string | undefined, apiKey: string | undefined, roles: AuthRole[]): boolean {
   const principal = resolvePrincipal(authorization, apiKey);
   return Boolean(principal && roles.includes(principal.role));
+}
+
+function canReadCollection(collection: string, authorization: string | undefined, apiKey: string | undefined): boolean {
+  const roles = config.collectionPermissions[collection]?.read;
+  if (!roles || roles.length === 0) {
+    return true;
+  }
+
+  return hasRole(authorization, apiKey, roles);
+}
+
+function canWriteCollection(collection: string, authorization: string | undefined, apiKey: string | undefined): boolean {
+  const roles = config.collectionPermissions[collection]?.write;
+  if (!roles || roles.length === 0) {
+    return true;
+  }
+
+  return hasRole(authorization, apiKey, roles);
 }
 
 function resolvePrincipal(authorization: string | undefined, apiKey: string | null | undefined): Principal | null {
@@ -333,13 +371,42 @@ function isWriteRequest(method: string, path: string): boolean {
 }
 
 function audit(action: string, metadata: Record<string, unknown>): void {
-  try {
+  void Promise.resolve(
     database.create("audit_logs", {
       action,
       metadata,
       createdAt: new Date().toISOString()
-    });
-  } catch (error) {
+    })
+  ).catch((error) => {
     console.warn(`[warn] Failed to write audit log: ${(error as Error).message}`);
+  });
+}
+
+async function createDatabase(): Promise<DatabaseAdapter> {
+  if (config.databaseDriver === "postgres") {
+    if (!config.postgresUrl) {
+      throw new Error("OPENBACKEND_POSTGRES_URL is required when OPENBACKEND_DATABASE=postgres");
+    }
+
+    return PostgresCollectionStore.connect(config.postgresUrl);
   }
+
+  return new CollectionStore(join(config.dataDir, "openbackend.sqlite"));
+}
+
+async function createStorage(): Promise<ObjectStorageAdapter> {
+  if (config.storageDriver === "minio") {
+    if (!config.s3Endpoint) {
+      throw new Error("OPENBACKEND_S3_ENDPOINT is required when OPENBACKEND_STORAGE=minio");
+    }
+
+    return S3CompatibleObjectStorage.connect({
+      endpoint: config.s3Endpoint,
+      bucket: config.s3Bucket,
+      accessKeyId: config.s3AccessKeyId ?? undefined,
+      secretAccessKey: config.s3SecretAccessKey ?? undefined
+    });
+  }
+
+  return new LocalObjectStorage(join(config.dataDir, "files"), join(config.dataDir, "storage.sqlite"));
 }

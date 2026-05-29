@@ -105,6 +105,8 @@ export class LocalObjectStorage {
   }
 }
 
+export * from "./adapters.js";
+
 function mapObject(row: unknown): StoredObject {
   const record = row as {
     id: string;

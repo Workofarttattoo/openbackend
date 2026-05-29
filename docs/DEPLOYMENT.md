@@ -34,10 +34,10 @@ OpenBackend has no mandatory payment gates. Each size runs on infrastructure you
 | Size | Command | Included services | Best fit |
 | --- | --- | --- | --- |
 | Local | `npm run deploy -- local` | OpenBackend, SQLite, local filesystem storage | Laptop, dev machine, kiosk |
-| NAS | `npm run deploy -- nas` | OpenBackend plus optional MinIO object storage service | Home lab, office NAS, shared LAN |
-| VPS | `npm run deploy -- vps` | OpenBackend plus optional MinIO and PostgreSQL services | Larger self-hosted server |
+| NAS | `npm run deploy -- nas` | OpenBackend plus MinIO object storage service | Home lab, office NAS, shared LAN |
+| VPS | `npm run deploy -- vps` | OpenBackend plus MinIO and PostgreSQL services | Larger self-hosted server |
 
-The MVP server still uses SQLite/filesystem storage internally by default. The NAS/VPS profiles start open-source scale-up services so the deployment shape is ready as adapters land.
+The local profile uses SQLite and filesystem storage. The NAS profile switches storage to MinIO. The VPS profile switches storage to MinIO and documents to PostgreSQL.
 
 Stop services:
 
@@ -63,6 +63,8 @@ docker compose --profile vps up --build -d
 | `OPENBACKEND_PUBLIC_URL` | Public base URL shown in docs/scripts |
 | `OPENBACKEND_CORS_ORIGINS` | Comma-separated allowed browser origins |
 | `OPENBACKEND_DEPLOY_SIZE` | `local`, `nas`, or `vps` deployment profile |
+| `OPENBACKEND_DATABASE` | `sqlite` or `postgres` |
+| `OPENBACKEND_STORAGE` | `filesystem` or `minio` |
 | `OPENBACKEND_REQUIRE_AUTH` | Require sessions/API keys for protected admin APIs |
 | `OPENBACKEND_REQUIRE_WRITE_AUTH` | Require sessions/API keys for collection writes, uploads, and function runs |
 | `OPENBACKEND_MAX_UPLOAD_BYTES` | Maximum JSON upload payload size |
@@ -72,11 +74,35 @@ docker compose --profile vps up --build -d
 | `OPENBACKEND_RATE_LIMIT_MAX` | Max requests per window per client IP |
 | `OPENBACKEND_FUNCTION_TIMEOUT_MS` | Local function timeout in milliseconds |
 | `OPENBACKEND_REQUIRE_REALTIME_AUTH` | Require token/API key for WebSocket watches |
+| `OPENBACKEND_COLLECTION_PERMISSIONS` | JSON map of collection read/write role rules |
 | `MINIO_ROOT_USER` | Optional MinIO admin user for NAS/VPS profile |
 | `MINIO_ROOT_PASSWORD` | Optional MinIO admin password for NAS/VPS profile |
 | `POSTGRES_DB` | Optional PostgreSQL database for VPS profile |
 | `POSTGRES_USER` | Optional PostgreSQL user for VPS profile |
 | `POSTGRES_PASSWORD` | Optional PostgreSQL password for VPS profile |
+| `OPENBACKEND_POSTGRES_URL` | PostgreSQL connection string when `OPENBACKEND_DATABASE=postgres` |
+| `OPENBACKEND_S3_ENDPOINT` | MinIO/S3-compatible endpoint when `OPENBACKEND_STORAGE=minio` |
+| `OPENBACKEND_S3_BUCKET` | MinIO/S3-compatible bucket name |
+| `OPENBACKEND_S3_ACCESS_KEY_ID` | MinIO/S3 access key |
+| `OPENBACKEND_S3_SECRET_ACCESS_KEY` | MinIO/S3 secret key |
+
+## Collection Permissions
+
+Public reads are allowed by default. Writes require an authenticated `admin`, `editor`, or `device` role by default. Add per-collection rules with JSON:
+
+```bash
+OPENBACKEND_COLLECTION_PERMISSIONS='{
+  "private_notes": {
+    "read": ["admin", "viewer"],
+    "write": ["admin"]
+  },
+  "website_posts": {
+    "write": ["admin", "editor"]
+  }
+}'
+```
+
+Roles are `admin`, `editor`, `viewer`, and `device`.
 
 ## No-Fee Deployment Principles
 

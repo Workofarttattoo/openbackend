@@ -20,7 +20,7 @@ npm run deploy -- nas
 ```
 
 - OpenBackend service.
-- Optional MinIO container for S3-compatible object storage.
+- MinIO container for S3-compatible object storage.
 - Persistent `./data` bind mount for easy backup to NAS/external drives.
 - Best for client websites, LAN apps, shared office tools, and small device fleets.
 
@@ -31,8 +31,8 @@ npm run deploy -- vps
 ```
 
 - OpenBackend service.
-- Optional MinIO object storage.
-- Optional PostgreSQL service for the future server-mode adapter.
+- MinIO object storage.
+- PostgreSQL service for server-mode document storage.
 - Best for larger self-hosted deployments.
 
 ## Rules
