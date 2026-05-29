@@ -32,8 +32,10 @@ This checklist gates the first self-hosted alpha.
 - PostgreSQL mode.
 - MinIO adapter.
 - CRDT conflict resolution.
-- Function sandboxing.
-- Full permission rules engine.
+- Function sandboxing for public production.
+- Full permission rules engine for public production.
+- Authenticated realtime sockets.
+- Reverse proxy TLS templates.
 
 ## Alpha Deploy Command
 

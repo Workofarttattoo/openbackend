@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Box, Database, Download, FileArchive, Play, Plus, RefreshCw, Users } from "lucide-react";
+import { Box, Database, Download, FileArchive, Play, Plus, RefreshCw, Trash2, Upload, Users } from "lucide-react";
 import { createOpenBackend, type DocumentRecord } from "@openbackend/sdk-js";
 import "./styles.css";
 
@@ -20,6 +20,7 @@ function App() {
   const [userPassword, setUserPassword] = useState("change-me-now");
   const [apiKeyLabel, setApiKeyLabel] = useState("pos-kiosk");
   const [newApiKey, setNewApiKey] = useState("");
+  const [importJson, setImportJson] = useState("");
   const [status, setStatus] = useState("Ready");
   const client = useMemo(() => createOpenBackend({ url: backendUrl, token }), [token]);
   const db = useMemo(() => client.database(), [client]);
@@ -96,6 +97,23 @@ function App() {
     anchor.download = "openbackend-export.json";
     anchor.click();
     URL.revokeObjectURL(url);
+  };
+
+  const importData = async () => {
+    const payload = JSON.parse(importJson);
+    const result = await postJson<{ importedDocuments: number }>("/api/admin/import", payload, token);
+    setStatus(`Imported ${result.importedDocuments} documents`);
+    setImportJson("");
+    await refresh();
+  };
+
+  const deleteFile = async (id: string) => {
+    await fetch(`${backendUrl}/api/files/${id}`, {
+      method: "DELETE",
+      headers: authHeaders(token)
+    });
+    setStatus("File deleted");
+    await refresh();
   };
 
   if (!token) {
@@ -189,6 +207,18 @@ function App() {
           {newApiKey && <code className="secret-output">{newApiKey}</code>}
         </section>
 
+        <section className="toolbar">
+          <label className="wide">
+            Import JSON
+            <input
+              value={importJson}
+              onChange={(event) => setImportJson(event.target.value)}
+              placeholder='{"database":{"documents":[]}}'
+            />
+          </label>
+          <button onClick={importData} disabled={!importJson.trim()}><Upload size={18} /> Import</button>
+        </section>
+
         <section className="grid">
           <Panel title="Documents" count={documents.length}>
             <Table rows={documents.map((item) => ({ id: item.id, ...item.data, rev: item.revision }))} />
@@ -200,7 +230,14 @@ function App() {
             <Table rows={apiKeys as Array<Record<string, unknown>>} />
           </Panel>
           <Panel title="Files" count={files.length}>
-            <Table rows={files as Array<Record<string, unknown>>} />
+            <Table
+              rows={files as Array<Record<string, unknown>>}
+              action={(row) => (
+                <button className="row-action" onClick={() => deleteFile(String(row.id))} title="Delete file">
+                  <Trash2 size={15} />
+                </button>
+              )}
+            />
           </Panel>
           <Panel title="Functions" count={functions.length}>
             <div className="function-list">
@@ -229,7 +266,13 @@ function Panel(props: { title: string; count: number; children: React.ReactNode 
   );
 }
 
-function Table({ rows }: { rows: Array<Record<string, unknown>> }) {
+function Table({
+  rows,
+  action
+}: {
+  rows: Array<Record<string, unknown>>;
+  action?: (row: Record<string, unknown>) => React.ReactNode;
+}) {
   const columns = [...new Set(rows.flatMap((row) => Object.keys(row)))].slice(0, 5);
 
   if (rows.length === 0) {
@@ -239,12 +282,16 @@ function Table({ rows }: { rows: Array<Record<string, unknown>> }) {
   return (
     <table>
       <thead>
-        <tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr>
+        <tr>
+          {columns.map((column) => <th key={column}>{column}</th>)}
+          {action && <th></th>}
+        </tr>
       </thead>
       <tbody>
         {rows.map((row, index) => (
           <tr key={String(row.id ?? index)}>
             {columns.map((column) => <td key={column}>{String(row[column] ?? "")}</td>)}
+            {action && <td>{action(row)}</td>}
           </tr>
         ))}
       </tbody>

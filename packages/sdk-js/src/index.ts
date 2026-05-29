@@ -14,6 +14,28 @@ export type DocumentRecord<T = unknown> = {
   deletedAt: string | null;
 };
 
+export type StoredObject = {
+  id: string;
+  name: string;
+  path: string;
+  size: number;
+  contentType: string;
+  createdAt: string;
+};
+
+export type AuthSession = {
+  token: string;
+  userId: string;
+  createdAt: string;
+  expiresAt: string;
+};
+
+export type AuthResult = {
+  user?: unknown;
+  session?: AuthSession;
+  token?: string;
+};
+
 export function createOpenBackend(options: OpenBackendOptions): OpenBackendClient {
   return new OpenBackendClient(options);
 }
@@ -30,6 +52,22 @@ export class OpenBackendClient {
     };
   }
 
+  setToken(token: string): this {
+    this.#auth.token = token;
+    return this;
+  }
+
+  setApiKey(apiKey: string): this {
+    this.#auth.apiKey = apiKey;
+    return this;
+  }
+
+  clearAuth(): this {
+    delete this.#auth.token;
+    delete this.#auth.apiKey;
+    return this;
+  }
+
   database(): DatabaseClient {
     return new DatabaseClient(this.#url, this.#auth);
   }
@@ -43,7 +81,7 @@ export class OpenBackendClient {
   }
 
   functions(): FunctionsClient {
-    return new FunctionsClient(this.#url);
+    return new FunctionsClient(this.#url, this.#auth);
   }
 }
 
@@ -139,14 +177,14 @@ export class AuthClient {
     }, this.#auth);
   }
 
-  login(email: string, password: string): Promise<unknown> {
+  login(email: string, password: string): Promise<AuthSession> {
     return request(`${this.#url}/api/auth/sessions`, {
       method: "POST",
       body: JSON.stringify({ email, password })
     });
   }
 
-  bootstrap(email: string, password: string): Promise<unknown> {
+  bootstrap(email: string, password: string): Promise<AuthResult> {
     return request(`${this.#url}/api/auth/bootstrap`, {
       method: "POST",
       body: JSON.stringify({ email, password })
@@ -167,26 +205,50 @@ export class StorageClient {
     this.#auth = auth;
   }
 
-  upload(name: string, data: string, contentType = "text/plain"): Promise<unknown> {
+  list(): Promise<StoredObject[]> {
+    return request(`${this.#url}/api/files`, {}, this.#auth);
+  }
+
+  upload(name: string, data: string, contentType = "text/plain"): Promise<StoredObject> {
     return request(`${this.#url}/api/files`, {
       method: "POST",
       body: JSON.stringify({ name, data, contentType, encoding: "utf8" })
+    }, this.#auth);
+  }
+
+  async download(id: string): Promise<Blob> {
+    const response = await fetch(`${this.#url}/api/files/${id}`, {
+      headers: authHeaders(this.#auth)
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    return response.blob();
+  }
+
+  remove(id: string): Promise<StoredObject> {
+    return request(`${this.#url}/api/files/${id}`, {
+      method: "DELETE"
     }, this.#auth);
   }
 }
 
 export class FunctionsClient {
   #url: string;
+  #auth: AuthHeaders;
 
-  constructor(url: string) {
+  constructor(url: string, auth: AuthHeaders) {
     this.#url = url;
+    this.#auth = auth;
   }
 
   run(name: string, body?: unknown): Promise<unknown> {
     return request(`${this.#url}/api/functions/${name}`, {
       method: "POST",
       body: JSON.stringify(body ?? {})
-    });
+    }, this.#auth);
   }
 }
 

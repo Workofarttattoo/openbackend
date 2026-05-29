@@ -35,6 +35,7 @@ See [docs/BMAD_BUILD_PLAN.md](docs/BMAD_BUILD_PLAN.md), [docs/MODULE_SCORECARD.m
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for local, NAS, and Docker deployment notes.
 See [docs/SCALE_PATH.md](docs/SCALE_PATH.md) for the no-fee scale-up path.
 See [docs/WEBSITE_BUILDS.md](docs/WEBSITE_BUILDS.md) for website build workflows.
+See [docs/ALPHA_READINESS.md](docs/ALPHA_READINESS.md) for what is ready now and what still gates public production.
 
 ## Quick Start
 

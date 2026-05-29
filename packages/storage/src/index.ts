@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import Database from "better-sqlite3";
@@ -68,6 +68,23 @@ export class LocalObjectStorage {
       object,
       data: readFileSync(object.path)
     };
+  }
+
+  delete(id: string): StoredObject {
+    const row = this.#db.prepare("select * from objects where id = ?").get(id);
+    if (!row) {
+      throw new Error(`File not found: ${id}`);
+    }
+
+    const object = mapObject(row);
+    try {
+      unlinkSync(object.path);
+    } catch {
+      // Metadata is the source of truth; tolerate an already-missing file.
+    }
+
+    this.#db.prepare("delete from objects where id = ?").run(id);
+    return object;
   }
 
   exportMetadata(): unknown[] {

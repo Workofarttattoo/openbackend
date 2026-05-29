@@ -216,6 +216,18 @@ app.get("/api/files/:id", (c) => {
   });
 });
 
+app.delete("/api/files/:id", (c) => {
+  const object = storage.delete(c.req.param("id"));
+  audit("file.deleted", { id: object.id, name: object.name });
+  realtime.publish({
+    topic: "files",
+    type: "deleted",
+    payload: object
+  });
+
+  return c.json(object);
+});
+
 app.get("/api/functions", (c) => c.json(functions.list()));
 
 app.post("/api/functions/:name", async (c) => {
@@ -280,6 +292,7 @@ function isWriteRequest(method: string, path: string): boolean {
   return (
     path.startsWith("/api/collections/") ||
     path === "/api/files" ||
+    path.startsWith("/api/files/") ||
     path.startsWith("/api/functions/")
   );
 }

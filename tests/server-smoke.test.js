@@ -88,6 +88,15 @@ describe("server deploy smoke", () => {
     const exported = await get("/api/admin/export", token);
     assert.ok(exported.database.documents);
     assert.equal(exported.storage.objects.length, 1);
+
+    const deletedFile = await fetch(`${baseUrl}/api/files/${file.id}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${token}` }
+    });
+    assert.equal(deletedFile.status, 200);
+
+    const filesAfterDelete = await get("/api/files", token);
+    assert.equal(filesAfterDelete.length, 0);
   });
 
   it("imports document snapshots", async () => {
