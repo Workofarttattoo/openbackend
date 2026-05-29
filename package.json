@@ -1,0 +1,26 @@
+{
+  "name": "openbackend-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "examples/*"
+  ],
+  "scripts": {
+    "build:packages": "npm run build -w packages/auth -w packages/database -w packages/functions -w packages/realtime -w packages/sdk-js -w packages/storage",
+    "dev": "npm run build:packages && npm run dev -w apps/server",
+    "dev:all": "npm run build:packages && concurrently \"npm run dev -w apps/server\" \"npm run dev -w apps/dashboard\"",
+    "build": "npm run build:packages && npm run build -w apps/server -w apps/dashboard -w examples/pos-kiosk",
+    "test": "node --test",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "@types/node": "^22.10.5",
+    "concurrently": "^9.1.2",
+    "eslint": "^9.18.0",
+    "typescript": "^5.7.3"
+  }
+}

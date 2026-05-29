@@ -1,0 +1,14 @@
+services:
+  openbackend:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    environment:
+      OPENBACKEND_HOST: 0.0.0.0
+      OPENBACKEND_PORT: 8787
+      OPENBACKEND_DATA_DIR: /var/lib/openbackend
+    ports:
+      - "8787:8787"
+    volumes:
+      - ./data:/var/lib/openbackend
+
