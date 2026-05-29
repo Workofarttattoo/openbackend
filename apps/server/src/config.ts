@@ -12,6 +12,10 @@ export type ServerConfig = {
   maxUploadBytes: number;
   backupDir: string;
   sessionTtlHours: number;
+  deploySize: "local" | "nas" | "vps";
+  postgresUrl: string | null;
+  s3Endpoint: string | null;
+  s3Bucket: string;
 };
 
 export function loadConfig(env = process.env): ServerConfig {
@@ -28,7 +32,11 @@ export function loadConfig(env = process.env): ServerConfig {
     requireWriteAuth: env.OPENBACKEND_REQUIRE_WRITE_AUTH !== "false",
     maxUploadBytes: Number(env.OPENBACKEND_MAX_UPLOAD_BYTES ?? "10485760"),
     backupDir: resolve(env.OPENBACKEND_BACKUP_DIR ?? "backups"),
-    sessionTtlHours: Number(env.OPENBACKEND_SESSION_TTL_HOURS ?? "168")
+    sessionTtlHours: Number(env.OPENBACKEND_SESSION_TTL_HOURS ?? "168"),
+    deploySize: parseDeploySize(env.OPENBACKEND_DEPLOY_SIZE ?? "local"),
+    postgresUrl: env.OPENBACKEND_POSTGRES_URL || null,
+    s3Endpoint: env.OPENBACKEND_S3_ENDPOINT || null,
+    s3Bucket: env.OPENBACKEND_S3_BUCKET ?? "openbackend"
   };
 }
 
@@ -55,4 +63,12 @@ function splitList(value: string): string[] {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function parseDeploySize(value: string): "local" | "nas" | "vps" {
+  if (value === "nas" || value === "vps") {
+    return value;
+  }
+
+  return "local";
 }

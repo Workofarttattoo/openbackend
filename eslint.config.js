@@ -23,6 +23,7 @@ export default [
         localStorage: "readonly",
         process: "readonly",
         setTimeout: "readonly",
+        Set: "readonly",
         URL: "readonly",
         URLSearchParams: "readonly",
         WebSocket: "readonly"

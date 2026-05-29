@@ -13,6 +13,8 @@
     "dev": "npm run build:packages && npm run dev -w apps/server",
     "dev:all": "npm run build:packages && concurrently \"npm run dev -w apps/server\" \"npm run dev -w apps/dashboard\"",
     "build": "npm run build:packages && npm run build -w apps/server -w apps/dashboard -w examples/pos-kiosk",
+    "deploy": "node scripts/deploy.js",
+    "stop": "node scripts/stop.js",
     "backup": "node scripts/backup.js",
     "restore": "node scripts/restore.js",
     "test": "node --test",

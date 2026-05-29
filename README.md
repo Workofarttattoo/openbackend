@@ -33,6 +33,7 @@ See [docs/RESEARCH.md](docs/RESEARCH.md) for the first-pass open-source componen
 See [docs/HOSTED_BACKEND_PARITY.md](docs/HOSTED_BACKEND_PARITY.md) for the clean-room parity matrix.
 See [docs/BMAD_BUILD_PLAN.md](docs/BMAD_BUILD_PLAN.md), [docs/MODULE_SCORECARD.md](docs/MODULE_SCORECARD.md), and [docs/DEPLOY_READINESS.md](docs/DEPLOY_READINESS.md) for project execution tracking.
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for local, NAS, and Docker deployment notes.
+See [docs/SCALE_PATH.md](docs/SCALE_PATH.md) for the no-fee scale-up path.
 
 ## Quick Start
 
@@ -58,11 +59,21 @@ npm run build
 npm run dev
 ```
 
-For Docker:
+One-button Docker deploy:
 
 ```bash
-docker compose up --build
+npm run deploy
 ```
+
+Scale up without changing platforms:
+
+```bash
+npm run deploy -- local
+npm run deploy -- nas
+npm run deploy -- vps
+```
+
+All deploy sizes are self-hosted and use permissive/open-source components. There are no mandatory payment gates, hosted accounts, or cloud fees.
 
 Before upgrades or experiments, create a local snapshot:
 

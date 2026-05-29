@@ -39,6 +39,8 @@ This project uses bMAD as an operating loop, not just a planning exercise.
 - [x] Integration tests
 - [x] Deploy guide
 - [x] Dashboard login/bootstrap flow
+- [x] One-button Docker deploy command
+- [x] Scale profiles for local, NAS, and VPS deployments
 
 ## Definition of Done
 

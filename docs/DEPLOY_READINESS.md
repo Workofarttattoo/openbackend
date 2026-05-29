@@ -16,6 +16,8 @@ This checklist gates the first self-hosted alpha.
 - [x] Restore command for SQLite databases and file objects.
 - [x] Server integration tests.
 - [x] README deploy section.
+- [x] One-button deploy command.
+- [x] Scalable self-hosted deploy profiles.
 
 ## Should Do
 

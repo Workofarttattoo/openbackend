@@ -68,7 +68,15 @@ app.use(async (c, next) => {
   return c.json({ error: { message: "Write authorization required" } }, 401);
 });
 
-app.get("/health", (c) => c.json({ ok: true, name: "openbackend", mode: "local" }));
+app.get("/health", (c) => {
+  return c.json({
+    ok: true,
+    name: "openbackend",
+    mode: config.deploySize,
+    storage: config.s3Endpoint ? "s3-compatible" : "filesystem",
+    database: config.postgresUrl ? "postgresql-configured" : "sqlite"
+  });
+});
 
 app.get("/api/collections", (c) => c.json(database.collections()));
 

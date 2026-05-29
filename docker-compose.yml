@@ -4,13 +4,70 @@ services:
       context: .
       dockerfile: apps/server/Dockerfile
     environment:
-      OPENBACKEND_HOST: ${OPENBACKEND_HOST:-0.0.0.0}
+      OPENBACKEND_HOST: 0.0.0.0
       OPENBACKEND_PORT: ${OPENBACKEND_PORT:-8787}
-      OPENBACKEND_DATA_DIR: ${OPENBACKEND_DATA_DIR:-/var/lib/openbackend}
+      OPENBACKEND_DATA_DIR: /var/lib/openbackend
+      OPENBACKEND_PUBLIC_URL: ${OPENBACKEND_PUBLIC_URL:-http://localhost:8787}
       OPENBACKEND_CORS_ORIGINS: ${OPENBACKEND_CORS_ORIGINS:-http://localhost:5173,http://localhost:5174}
       OPENBACKEND_REQUIRE_AUTH: ${OPENBACKEND_REQUIRE_AUTH:-true}
+      OPENBACKEND_REQUIRE_WRITE_AUTH: ${OPENBACKEND_REQUIRE_WRITE_AUTH:-true}
       OPENBACKEND_MAX_UPLOAD_BYTES: ${OPENBACKEND_MAX_UPLOAD_BYTES:-10485760}
+      OPENBACKEND_SESSION_TTL_HOURS: ${OPENBACKEND_SESSION_TTL_HOURS:-168}
+      OPENBACKEND_DEPLOY_SIZE: ${OPENBACKEND_DEPLOY_SIZE:-local}
+      OPENBACKEND_POSTGRES_URL: ${OPENBACKEND_POSTGRES_URL:-}
+      OPENBACKEND_S3_ENDPOINT: ${OPENBACKEND_S3_ENDPOINT:-}
+      OPENBACKEND_S3_BUCKET: ${OPENBACKEND_S3_BUCKET:-openbackend}
     ports:
-      - "8787:8787"
+      - "${OPENBACKEND_PORT:-8787}:8787"
     volumes:
       - ./data:/var/lib/openbackend
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/health').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    profiles: ["nas", "vps"]
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-openbackend}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-this-minio-password}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - openbackend-objects:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:17-alpine
+    profiles: ["vps"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-openbackend}
+      POSTGRES_USER: ${POSTGRES_USER:-openbackend}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-this-postgres-password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - openbackend-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  openbackend-objects:
+  openbackend-postgres:
