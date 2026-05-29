@@ -12,7 +12,9 @@ import { loadConfig } from "./config.js";
 const config = loadConfig();
 
 const database = new CollectionStore(join(config.dataDir, "openbackend.sqlite"));
-const auth = new AuthService(join(config.dataDir, "auth.sqlite"));
+const auth = new AuthService(join(config.dataDir, "auth.sqlite"), {
+  sessionTtlMs: config.sessionTtlHours * 60 * 60 * 1000
+});
 const storage = new LocalObjectStorage(join(config.dataDir, "files"), join(config.dataDir, "storage.sqlite"));
 const functions = new FunctionRegistry();
 const realtime = new RealtimeHub();
@@ -50,6 +52,20 @@ app.use("/api/admin/*", async (c, next) => {
   }
 
   return c.json({ error: { message: "Admin authorization required" } }, 401);
+});
+
+app.use(async (c, next) => {
+  if (!config.requireWriteAuth || !isWriteRequest(c.req.method, c.req.path)) {
+    await next();
+    return;
+  }
+
+  if (isAuthorized(c.req.header("authorization"), c.req.header("x-openbackend-api-key"))) {
+    await next();
+    return;
+  }
+
+  return c.json({ error: { message: "Write authorization required" } }, 401);
 });
 
 app.get("/health", (c) => c.json({ ok: true, name: "openbackend", mode: "local" }));
@@ -246,6 +262,18 @@ function bearerToken(authorization: string | undefined): string | null {
   }
 
   return authorization.slice("Bearer ".length).trim();
+}
+
+function isWriteRequest(method: string, path: string): boolean {
+  if (!["POST", "PATCH", "DELETE"].includes(method)) {
+    return false;
+  }
+
+  return (
+    path.startsWith("/api/collections/") ||
+    path === "/api/files" ||
+    path.startsWith("/api/functions/")
+  );
 }
 
 function audit(action: string, metadata: Record<string, unknown>): void {

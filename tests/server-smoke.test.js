@@ -49,12 +49,23 @@ describe("server deploy smoke", () => {
   });
 
   it("persists files, creates API keys, and exports data", async () => {
-    const file = await post("/api/files", {
-      name: "hello.txt",
-      data: "hello",
-      encoding: "utf8",
-      contentType: "text/plain"
+    const blockedWrite = await fetch(`${baseUrl}/api/collections/products/documents`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data: { name: "Blocked" } })
     });
+    assert.equal(blockedWrite.status, 401);
+
+    const file = await post(
+      "/api/files",
+      {
+        name: "hello.txt",
+        data: "hello",
+        encoding: "utf8",
+        contentType: "text/plain"
+      },
+      token
+    );
 
     assert.equal(file.name, "hello.txt");
 
@@ -64,13 +75,23 @@ describe("server deploy smoke", () => {
     const apiKey = await post("/api/admin/auth/api-keys", { label: "smoke" }, token);
     assert.match(apiKey.key, /^ob_/);
 
+    const apiKeyWrite = await fetch(`${baseUrl}/api/collections/products/documents`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-openbackend-api-key": apiKey.key
+      },
+      body: JSON.stringify({ data: { name: "Coffee", price: 4.5 } })
+    });
+    assert.equal(apiKeyWrite.status, 201);
+
     const exported = await get("/api/admin/export", token);
     assert.ok(exported.database.documents);
     assert.equal(exported.storage.objects.length, 1);
   });
 
   it("imports document snapshots", async () => {
-    const imported = await post(
+  const imported = await post(
       "/api/admin/import",
       {
         database: {

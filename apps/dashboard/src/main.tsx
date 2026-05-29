@@ -12,11 +12,14 @@ function App() {
   const [collection, setCollection] = useState("products");
   const [documents, setDocuments] = useState<Array<DocumentRecord<Record<string, unknown>>>>([]);
   const [users, setUsers] = useState<Array<unknown>>([]);
+  const [apiKeys, setApiKeys] = useState<Array<unknown>>([]);
   const [files, setFiles] = useState<Array<unknown>>([]);
   const [functions, setFunctions] = useState<Array<string>>([]);
   const [draft, setDraft] = useState('{"name":"Coffee","price":4.5}');
   const [userEmail, setUserEmail] = useState("owner@example.local");
   const [userPassword, setUserPassword] = useState("change-me-now");
+  const [apiKeyLabel, setApiKeyLabel] = useState("pos-kiosk");
+  const [newApiKey, setNewApiKey] = useState("");
   const [status, setStatus] = useState("Ready");
   const client = useMemo(() => createOpenBackend({ url: backendUrl, token }), [token]);
   const db = useMemo(() => client.database(), [client]);
@@ -26,15 +29,17 @@ function App() {
   }, [client]);
 
   const refresh = async () => {
-    const [items, userList, fileList, functionList] = await Promise.all([
+    const [items, userList, apiKeyList, fileList, functionList] = await Promise.all([
       db.collection<Record<string, unknown>>(collection).list(),
       fetchJson<Array<unknown>>("/api/admin/auth/users", token),
+      fetchJson<Array<unknown>>("/api/admin/auth/api-keys", token),
       fetchJson<Array<unknown>>("/api/files", token),
       fetchJson<Array<string>>("/api/functions", token)
     ]);
 
     setDocuments(items);
     setUsers(userList);
+    setApiKeys(apiKeyList);
     setFiles(fileList);
     setFunctions(functionList);
   };
@@ -59,6 +64,13 @@ function App() {
   const createUser = async () => {
     await client.auth().createUser(userEmail, userPassword);
     setStatus("User created");
+    await refresh();
+  };
+
+  const createApiKey = async () => {
+    const result = await postJson<{ key: string }>("/api/admin/auth/api-keys", { label: apiKeyLabel }, token);
+    setNewApiKey(result.key);
+    setStatus("API key created");
     await refresh();
   };
 
@@ -168,12 +180,24 @@ function App() {
           <button onClick={createUser}><Plus size={18} /> User</button>
         </section>
 
+        <section className="toolbar">
+          <label>
+            API key label
+            <input value={apiKeyLabel} onChange={(event) => setApiKeyLabel(event.target.value)} />
+          </label>
+          <button onClick={createApiKey}><Plus size={18} /> API Key</button>
+          {newApiKey && <code className="secret-output">{newApiKey}</code>}
+        </section>
+
         <section className="grid">
           <Panel title="Documents" count={documents.length}>
             <Table rows={documents.map((item) => ({ id: item.id, ...item.data, rev: item.revision }))} />
           </Panel>
           <Panel title="Users" count={users.length}>
             <Table rows={users as Array<Record<string, unknown>>} />
+          </Panel>
+          <Panel title="API Keys" count={apiKeys.length}>
+            <Table rows={apiKeys as Array<Record<string, unknown>>} />
           </Panel>
           <Panel title="Files" count={files.length}>
             <Table rows={files as Array<Record<string, unknown>>} />
@@ -231,6 +255,18 @@ function Table({ rows }: { rows: Array<Record<string, unknown>> }) {
 async function fetchJson<T>(path: string, token: string): Promise<T> {
   const response = await fetch(`${backendUrl}${path}`, {
     headers: authHeaders(token)
+  });
+  return response.json() as Promise<T>;
+}
+
+async function postJson<T>(path: string, body: unknown, token: string): Promise<T> {
+  const response = await fetch(`${backendUrl}${path}`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...authHeaders(token)
+    },
+    body: JSON.stringify(body)
   });
   return response.json() as Promise<T>;
 }

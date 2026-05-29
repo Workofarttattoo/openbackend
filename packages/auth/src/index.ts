@@ -14,6 +14,7 @@ export type Session = {
   token: string;
   userId: string;
   createdAt: string;
+  expiresAt: string;
 };
 
 export type ApiKeyRecord = {
@@ -24,10 +25,12 @@ export type ApiKeyRecord = {
 
 export class AuthService {
   #db: Database.Database;
+  #sessionTtlMs: number;
 
-  constructor(filePath: string) {
+  constructor(filePath: string, options: { sessionTtlMs?: number } = {}) {
     mkdirSync(dirname(filePath), { recursive: true });
     this.#db = new Database(filePath);
+    this.#sessionTtlMs = options.sessionTtlMs ?? 7 * 24 * 60 * 60 * 1000;
     this.#db.pragma("journal_mode = WAL");
     this.#migrate();
   }
@@ -69,12 +72,13 @@ export class AuthService {
     const session = {
       token: randomBytes(32).toString("hex"),
       userId: user.id,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + this.#sessionTtlMs).toISOString()
     };
 
     this.#db
-      .prepare("insert into sessions (token, user_id, created_at) values (?, ?, ?)")
-      .run(session.token, session.userId, session.createdAt);
+      .prepare("insert into sessions (token, user_id, created_at, expires_at) values (?, ?, ?, ?)")
+      .run(session.token, session.userId, session.createdAt, session.expiresAt);
 
     return session;
   }
@@ -85,7 +89,17 @@ export class AuthService {
 
   getSession(token: string): Session | null {
     const row = this.#db.prepare("select * from sessions where token = ?").get(token);
-    return row ? mapSession(row) : null;
+    const session = row ? mapSession(row) : null;
+    if (!session) {
+      return null;
+    }
+
+    if (Date.parse(session.expiresAt) <= Date.now()) {
+      this.logout(session.token);
+      return null;
+    }
+
+    return session;
   }
 
   listUsers(): Array<Omit<Identity, "passwordHash">> {
@@ -143,7 +157,8 @@ export class AuthService {
       create table if not exists sessions (
         token text primary key,
         user_id text not null references identities(id) on delete cascade,
-        created_at text not null
+        created_at text not null,
+        expires_at text not null
       );
 
       create table if not exists api_keys (
@@ -152,6 +167,12 @@ export class AuthService {
         created_at text not null
       );
     `);
+
+    const sessionColumns = this.#db.prepare("pragma table_info(sessions)").all() as Array<{ name: string }>;
+    if (!sessionColumns.some((column) => column.name === "expires_at")) {
+      const expiresAt = new Date(Date.now() + this.#sessionTtlMs).toISOString();
+      this.#db.exec(`alter table sessions add column expires_at text not null default '${expiresAt}'`);
+    }
   }
 }
 
@@ -196,11 +217,13 @@ function mapSession(row: unknown): Session {
     token: string;
     user_id: string;
     created_at: string;
+    expires_at: string;
   };
 
   return {
     token: record.token,
     userId: record.user_id,
-    createdAt: record.created_at
+    createdAt: record.created_at,
+    expiresAt: record.expires_at
   };
 }

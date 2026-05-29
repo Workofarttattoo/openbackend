@@ -71,6 +71,7 @@ npm run backup
 ```
 
 The first dashboard visit bootstraps an admin user. After bootstrap, protected admin APIs require a session bearer token or `x-openbackend-api-key`.
+Collection writes, file uploads, and function runs also require a session or API key by default for self-hosted safety.
 
 ## SDK Example
 

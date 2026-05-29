@@ -37,8 +37,10 @@ Data is stored under `./data` by default. Mount that folder to a persistent disk
 | `OPENBACKEND_PUBLIC_URL` | Public base URL shown in docs/scripts |
 | `OPENBACKEND_CORS_ORIGINS` | Comma-separated allowed browser origins |
 | `OPENBACKEND_REQUIRE_AUTH` | Require sessions/API keys for protected admin APIs |
+| `OPENBACKEND_REQUIRE_WRITE_AUTH` | Require sessions/API keys for collection writes, uploads, and function runs |
 | `OPENBACKEND_MAX_UPLOAD_BYTES` | Maximum JSON upload payload size |
 | `OPENBACKEND_BACKUP_DIR` | Destination for local backup snapshots |
+| `OPENBACKEND_SESSION_TTL_HOURS` | Session lifetime in hours |
 
 ## First Admin
 
@@ -54,3 +56,20 @@ npm run backup
 
 The script copies local SQLite databases and file objects into `OPENBACKEND_BACKUP_DIR`.
 
+Restore the latest backup:
+
+```bash
+npm run restore
+```
+
+Restore a specific backup:
+
+```bash
+npm run restore -- ./backups/2026-05-29T15-33-32.371Z
+```
+
+Stop the server before restoring so SQLite files are not open while being replaced.
+
+## Kiosk and Device Writes
+
+Mutating APIs require a session bearer token or `x-openbackend-api-key` by default. Create a device API key from the admin API, then pass it to the POS kiosk with `?apiKey=...` or paste it into the kiosk field.

@@ -13,6 +13,7 @@ This checklist gates the first self-hosted alpha.
 - [x] Docker healthcheck.
 - [x] Import endpoint paired with export.
 - [x] Backup command for SQLite databases and file objects.
+- [x] Restore command for SQLite databases and file objects.
 - [x] Server integration tests.
 - [x] README deploy section.
 

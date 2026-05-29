@@ -15,26 +15,30 @@ type Sale = {
   createdAt: string;
 };
 
-const app = createOpenBackend({ url: "http://localhost:8787" });
-const db = app.database();
-
 function PosKiosk() {
+  const [apiKey, setApiKey] = useState(() => {
+    return new URLSearchParams(window.location.search).get("apiKey") ?? localStorage.getItem("openbackend.pos.apiKey") ?? "";
+  });
   const [products, setProducts] = useState<Array<DocumentRecord<Product>>>([]);
   const [sales, setSales] = useState<Array<DocumentRecord<Sale>>>([]);
   const [name, setName] = useState("Coffee");
   const [price, setPrice] = useState("4.50");
+  const app = useMemo(() => createOpenBackend({ url: "http://localhost:8787", apiKey }), [apiKey]);
+  const db = useMemo(() => app.database(), [app]);
 
-  const productStore = useMemo(() => db.collection<Product>("products"), []);
-  const saleStore = useMemo(() => db.collection<Sale>("sales"), []);
+  const productStore = useMemo(() => db.collection<Product>("products"), [db]);
+  const saleStore = useMemo(() => db.collection<Sale>("sales"), [db]);
 
-  useEffect(() => productStore.watch(setProducts), []);
-  useEffect(() => saleStore.watch(setSales), []);
+  useEffect(() => productStore.watch(setProducts), [productStore]);
+  useEffect(() => saleStore.watch(setSales), [saleStore]);
 
   const addProduct = async () => {
+    localStorage.setItem("openbackend.pos.apiKey", apiKey);
     await productStore.create({ name, price: Number(price) });
   };
 
   const sell = async (product: Product) => {
+    localStorage.setItem("openbackend.pos.apiKey", apiKey);
     await saleStore.create({
       item: product.name,
       total: product.price,
@@ -55,6 +59,11 @@ function PosKiosk() {
       </header>
 
       <section className="composer">
+        <input
+          value={apiKey}
+          onChange={(event) => setApiKey(event.target.value)}
+          placeholder="Device API key"
+        />
         <input value={name} onChange={(event) => setName(event.target.value)} />
         <input value={price} onChange={(event) => setPrice(event.target.value)} inputMode="decimal" />
         <button onClick={addProduct}><Plus size={18} /> Add</button>
@@ -89,4 +98,3 @@ function PosKiosk() {
 }
 
 createRoot(document.getElementById("root") as HTMLElement).render(<PosKiosk />);
-
