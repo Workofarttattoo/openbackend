@@ -13,7 +13,7 @@ const host = process.env.OPENBACKEND_HOST ?? "127.0.0.1";
 const port = Number(process.env.OPENBACKEND_PORT ?? "8787");
 
 const database = new CollectionStore(join(dataDir, "openbackend.sqlite"));
-const auth = new AuthService();
+const auth = new AuthService(join(dataDir, "auth.sqlite"));
 const storage = new LocalObjectStorage(join(dataDir, "files"));
 const functions = new FunctionRegistry();
 const realtime = new RealtimeHub();

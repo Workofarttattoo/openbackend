@@ -13,6 +13,8 @@ function App() {
   const [files, setFiles] = useState<Array<unknown>>([]);
   const [functions, setFunctions] = useState<Array<string>>([]);
   const [draft, setDraft] = useState('{"name":"Coffee","price":4.5}');
+  const [userEmail, setUserEmail] = useState("owner@example.local");
+  const [userPassword, setUserPassword] = useState("change-me-now");
   const [status, setStatus] = useState("Ready");
   const db = useMemo(() => client.database(), []);
 
@@ -45,6 +47,12 @@ function App() {
   const runFunction = async (name: string) => {
     const result = await client.functions().run(name, { source: "dashboard" });
     setStatus(JSON.stringify(result));
+  };
+
+  const createUser = async () => {
+    await client.auth().createUser(userEmail, userPassword);
+    setStatus("User created");
+    await refresh();
   };
 
   return (
@@ -84,6 +92,22 @@ function App() {
             <input value={draft} onChange={(event) => setDraft(event.target.value)} />
           </label>
           <button onClick={createDocument}><Plus size={18} /> Create</button>
+        </section>
+
+        <section className="toolbar">
+          <label>
+            User email
+            <input value={userEmail} onChange={(event) => setUserEmail(event.target.value)} />
+          </label>
+          <label>
+            Password
+            <input
+              value={userPassword}
+              onChange={(event) => setUserPassword(event.target.value)}
+              type="password"
+            />
+          </label>
+          <button onClick={createUser}><Plus size={18} /> User</button>
         </section>
 
         <section className="grid">
@@ -152,4 +176,3 @@ async function fetchJson<T>(path: string): Promise<T> {
 }
 
 createRoot(document.getElementById("root") as HTMLElement).render(<App />);
-

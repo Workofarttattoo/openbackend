@@ -1,4 +1,7 @@
 import { pbkdf2Sync, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
+import Database from "better-sqlite3";
 
 export type Identity = {
   id: string;
@@ -14,13 +17,18 @@ export type Session = {
 };
 
 export class AuthService {
-  #users = new Map<string, Identity>();
-  #sessions = new Map<string, Session>();
-  #apiKeys = new Map<string, string>();
+  #db: Database.Database;
+
+  constructor(filePath: string) {
+    mkdirSync(dirname(filePath), { recursive: true });
+    this.#db = new Database(filePath);
+    this.#db.pragma("journal_mode = WAL");
+    this.#migrate();
+  }
 
   createUser(email: string, password: string): Omit<Identity, "passwordHash"> {
     const normalized = email.trim().toLowerCase();
-    if (this.#users.has(normalized)) {
+    if (this.#findUserByEmail(normalized)) {
       throw new Error("Email already exists");
     }
 
@@ -31,12 +39,15 @@ export class AuthService {
       createdAt: new Date().toISOString()
     };
 
-    this.#users.set(normalized, user);
+    this.#db
+      .prepare("insert into identities (id, email, password_hash, created_at) values (?, ?, ?, ?)")
+      .run(user.id, user.email, user.passwordHash, user.createdAt);
+
     return stripSecret(user);
   }
 
   login(email: string, password: string): Session {
-    const user = this.#users.get(email.trim().toLowerCase());
+    const user = this.#findUserByEmail(email.trim().toLowerCase());
     if (!user || !verifyPassword(password, user.passwordHash)) {
       throw new Error("Invalid email or password");
     }
@@ -47,22 +58,59 @@ export class AuthService {
       createdAt: new Date().toISOString()
     };
 
-    this.#sessions.set(session.token, session);
+    this.#db
+      .prepare("insert into sessions (token, user_id, created_at) values (?, ?, ?)")
+      .run(session.token, session.userId, session.createdAt);
+
     return session;
   }
 
   logout(token: string): void {
-    this.#sessions.delete(token);
+    this.#db.prepare("delete from sessions where token = ?").run(token);
   }
 
   listUsers(): Array<Omit<Identity, "passwordHash">> {
-    return [...this.#users.values()].map(stripSecret);
+    return this.#db
+      .prepare("select * from identities order by created_at desc")
+      .all()
+      .map((row) => stripSecret(mapIdentity(row)));
   }
 
   createApiKey(label: string): { label: string; key: string } {
     const key = `ob_${randomBytes(24).toString("hex")}`;
-    this.#apiKeys.set(key, label);
+    this.#db
+      .prepare("insert into api_keys (key, label, created_at) values (?, ?, ?)")
+      .run(key, label, new Date().toISOString());
+
     return { label, key };
+  }
+
+  #findUserByEmail(email: string): Identity | null {
+    const row = this.#db.prepare("select * from identities where email = ?").get(email);
+    return row ? mapIdentity(row) : null;
+  }
+
+  #migrate(): void {
+    this.#db.exec(`
+      create table if not exists identities (
+        id text primary key,
+        email text not null unique,
+        password_hash text not null,
+        created_at text not null
+      );
+
+      create table if not exists sessions (
+        token text primary key,
+        user_id text not null references identities(id) on delete cascade,
+        created_at text not null
+      );
+
+      create table if not exists api_keys (
+        key text primary key,
+        label text not null,
+        created_at text not null
+      );
+    `);
   }
 }
 
@@ -86,3 +134,18 @@ function stripSecret(user: Identity): Omit<Identity, "passwordHash"> {
   };
 }
 
+function mapIdentity(row: unknown): Identity {
+  const record = row as {
+    id: string;
+    email: string;
+    password_hash: string;
+    created_at: string;
+  };
+
+  return {
+    id: record.id,
+    email: record.email,
+    passwordHash: record.password_hash,
+    createdAt: record.created_at
+  };
+}

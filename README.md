@@ -30,6 +30,7 @@ This project is inspired by the broad developer-experience category of hosted ba
 
 See [docs/CLEAN_ROOM.md](docs/CLEAN_ROOM.md) for the full safety note.
 See [docs/RESEARCH.md](docs/RESEARCH.md) for the first-pass open-source component evaluation.
+See [docs/HOSTED_BACKEND_PARITY.md](docs/HOSTED_BACKEND_PARITY.md) for the clean-room parity matrix.
 
 ## Quick Start
 
