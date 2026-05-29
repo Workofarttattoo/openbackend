@@ -258,6 +258,31 @@ select {
   border-bottom: 1px solid #e7ece6;
 }
 
+.panel h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.metrics-list {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(0, 1fr);
+  gap: 8px 14px;
+  padding: 14px 16px;
+  margin: 0;
+}
+
+.metrics-list dt {
+  color: #607068;
+  font-size: 13px;
+}
+
+.metrics-list dd {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  overflow-wrap: anywhere;
+}
+
 .panel header span {
   min-width: 28px;
   height: 24px;

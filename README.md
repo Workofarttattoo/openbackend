@@ -38,6 +38,9 @@ See [docs/WEBSITE_BUILDS.md](docs/WEBSITE_BUILDS.md) for website build workflows
 See [docs/ALPHA_READINESS.md](docs/ALPHA_READINESS.md) for what is ready now and what still gates public production.
 See [docs/DOCKER_PROFILE_SMOKE.md](docs/DOCKER_PROFILE_SMOKE.md) for local/NAS/VPS Docker profile smoke tests.
 See [docs/TLS_VALIDATION.md](docs/TLS_VALIDATION.md) for real-domain TLS validation.
+See [docs/INSTALL.md](docs/INSTALL.md) and [docs/RELEASE.md](docs/RELEASE.md) for install and versioned release packaging.
+See [SECURITY.md](SECURITY.md), [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md), and [docs/HARDENING_CHECKLIST.md](docs/HARDENING_CHECKLIST.md) for security operations.
+See [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) for structured logs, metrics, health, and audit logs.
 
 ## Quick Start
 
@@ -125,6 +128,18 @@ packages/
   storage/          Filesystem object storage
 docs/               Architecture and clean-room notes
 examples/           POS/kiosk, website, and IoT demos
+```
+
+## Release Check
+
+```bash
+npm run release:check
+```
+
+Release candidates should also pass Docker profile smoke tests on a machine with Docker running:
+
+```bash
+npm run smoke:docker
 ```
 
 ## Roadmap

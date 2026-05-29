@@ -195,6 +195,26 @@ describe("server deploy smoke", () => {
     assert.equal(anonymousRead.status, 401);
   });
 
+  it("exposes health details, metrics, and audit logs", async () => {
+    const health = await get("/health");
+    assert.equal(health.ok, true);
+    assert.equal(health.name, "openbackend");
+    assert.equal(health.database, "sqlite");
+    assert.equal(health.storage, "filesystem");
+    assert.equal(typeof health.uptimeSeconds, "number");
+
+    const metrics = await get("/api/admin/metrics", token);
+    assert.ok(metrics.requestsTotal > 0);
+    assert.ok(metrics.auditEventsTotal > 0);
+
+    const publicMetrics = await get("/metrics");
+    assert.ok(publicMetrics.requestsTotal > 0);
+
+    const auditLogs = await get("/api/admin/audit-logs", token);
+    assert.ok(auditLogs.length > 0);
+    assert.ok(auditLogs.some((entry) => entry.data.action === "config.collection_permissions.updated"));
+  });
+
   it("requires auth for realtime sockets", async () => {
     const denied = await socketCloseCode(`${baseUrl.replace("http", "ws")}/realtime`);
     assert.equal(denied, 1008);

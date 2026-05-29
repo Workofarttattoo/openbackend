@@ -10,6 +10,8 @@ import { LocalObjectStorage, S3CompatibleObjectStorage, type ObjectStorageAdapte
 import { loadConfig } from "./config.js";
 
 const config = loadConfig();
+const startedAt = new Date();
+const version = process.env.OPENBACKEND_VERSION ?? process.env.npm_package_version ?? "0.1.0";
 
 const database: DatabaseAdapter = await createDatabase();
 const auth = new AuthService(join(config.dataDir, "auth.sqlite"), {
@@ -27,6 +29,15 @@ const realtime = new RealtimeHub({
   }
 });
 const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
+const metrics = {
+  requestsTotal: 0,
+  errorsTotal: 0,
+  rateLimitedTotal: 0,
+  documentsWrittenTotal: 0,
+  filesWrittenTotal: 0,
+  functionsRunTotal: 0,
+  auditEventsTotal: 0
+};
 
 functions.registerIsolated(
   "hello",
@@ -53,8 +64,30 @@ app.use(
 );
 
 app.onError((error, c) => {
+  metrics.errorsTotal += 1;
+  structuredLog("error", "request.error", {
+    method: c.req.method,
+    path: c.req.path,
+    error: error.message
+  });
   const status = error.message.includes("not found") ? 404 : 400;
   return c.json({ error: { message: error.message } }, status);
+});
+
+app.use(async (c, next) => {
+  const started = Date.now();
+  metrics.requestsTotal += 1;
+
+  try {
+    await next();
+  } finally {
+    structuredLog("info", "request.completed", {
+      method: c.req.method,
+      path: c.req.path,
+      status: c.res.status,
+      durationMs: Date.now() - started
+    });
+  }
 });
 
 app.use(async (c, next) => {
@@ -69,6 +102,8 @@ app.use(async (c, next) => {
 
   bucket.count += 1;
   if (bucket.count > config.rateLimitMax) {
+    metrics.rateLimitedTotal += 1;
+    structuredLog("warn", "request.rate_limited", { key, path: c.req.path });
     return c.json({ error: { message: "Rate limit exceeded" } }, 429);
   }
 
@@ -102,11 +137,19 @@ app.get("/health", (c) => {
   return c.json({
     ok: true,
     name: "openbackend",
+    version,
     mode: config.deploySize,
     storage: config.storageDriver,
-    database: config.databaseDriver
+    database: config.databaseDriver,
+    startedAt: startedAt.toISOString(),
+    uptimeSeconds: Math.floor((Date.now() - startedAt.getTime()) / 1000),
+    authRequired: config.requireAuth,
+    writeAuthRequired: config.requireWriteAuth,
+    realtimeAuthRequired: config.requireRealtimeAuth
   });
 });
+
+app.get("/metrics", (c) => c.json(metricsSnapshot()));
 
 app.get("/api/collections", async (c) => c.json(await database.collections()));
 
@@ -127,6 +170,7 @@ app.post("/api/collections/:collection/documents", async (c) => {
 
   const body = await c.req.json<{ id?: string; data: unknown }>();
   const change = await database.create(collection, body.data, body.id);
+  metrics.documentsWrittenTotal += 1;
   audit("document.created", { collection: change.document.collection, id: change.document.id });
   realtime.publish({
     topic: `collections:${change.document.collection}`,
@@ -145,6 +189,7 @@ app.patch("/api/collections/:collection/documents/:id", async (c) => {
 
   const body = await c.req.json<{ data: Record<string, unknown> }>();
   const change = await database.update(collection, c.req.param("id"), body.data);
+  metrics.documentsWrittenTotal += 1;
   audit("document.updated", { collection: change.document.collection, id: change.document.id });
   realtime.publish({
     topic: `collections:${change.document.collection}`,
@@ -162,6 +207,7 @@ app.delete("/api/collections/:collection/documents/:id", async (c) => {
   }
 
   const change = await database.delete(collection, c.req.param("id"));
+  metrics.documentsWrittenTotal += 1;
   audit("document.deleted", { collection: change.document.collection, id: change.document.id });
   realtime.publish({
     topic: `collections:${change.document.collection}`,
@@ -221,6 +267,14 @@ app.post("/api/admin/auth/api-keys", async (c) => {
 
 app.get("/api/admin/config/collection-permissions", (c) => c.json(config.collectionPermissions));
 
+app.get("/api/admin/audit-logs", async (c) => {
+  const limit = Number(c.req.query("limit") ?? "100");
+  const logs = await database.list("audit_logs");
+  return c.json(logs.slice(-Math.min(limit, 500)).reverse());
+});
+
+app.get("/api/admin/metrics", (c) => c.json(metricsSnapshot()));
+
 app.post("/api/admin/config/collection-permissions", async (c) => {
   const body = await c.req.json<Record<string, { read?: AuthRole[]; write?: AuthRole[] }>>();
   config.collectionPermissions = normalizeCollectionPermissions(body);
@@ -247,6 +301,7 @@ app.post("/api/files", async (c) => {
     contentType: body.contentType,
     data: Buffer.from(body.data, body.encoding ?? "base64")
   });
+  metrics.filesWrittenTotal += 1;
   audit("file.created", { id: object.id, name: object.name, size: object.size });
 
   realtime.publish({
@@ -295,6 +350,7 @@ app.post("/api/functions/:name", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const headers = Object.fromEntries(c.req.raw.headers.entries());
   const result = await functions.run(c.req.param("name"), { body, headers });
+  metrics.functionsRunTotal += 1;
   audit("function.ran", { name: c.req.param("name") });
   return c.json(result);
 });
@@ -326,7 +382,7 @@ const server = serve({
 
 realtime.attach(server as Parameters<typeof realtime.attach>[0]);
 
-console.log(`[info] OpenBackend server listening on http://${config.host}:${config.port}`);
+structuredLog("info", "server.started", { url: `http://${config.host}:${config.port}` });
 
 function hasRole(authorization: string | undefined, apiKey: string | undefined, roles: AuthRole[]): boolean {
   const principal = resolvePrincipal(authorization, apiKey);
@@ -404,6 +460,7 @@ function isWriteRequest(method: string, path: string): boolean {
 }
 
 function audit(action: string, metadata: Record<string, unknown>): void {
+  metrics.auditEventsTotal += 1;
   void Promise.resolve(
     database.create("audit_logs", {
       action,
@@ -411,8 +468,32 @@ function audit(action: string, metadata: Record<string, unknown>): void {
       createdAt: new Date().toISOString()
     })
   ).catch((error) => {
-    console.warn(`[warn] Failed to write audit log: ${(error as Error).message}`);
+    structuredLog("warn", "audit.write_failed", { error: (error as Error).message });
   });
+}
+
+function metricsSnapshot(): Record<string, unknown> {
+  return {
+    ...metrics,
+    startedAt: startedAt.toISOString(),
+    uptimeSeconds: Math.floor((Date.now() - startedAt.getTime()) / 1000),
+    version,
+    mode: config.deploySize,
+    database: config.databaseDriver,
+    storage: config.storageDriver
+  };
+}
+
+function structuredLog(level: "info" | "warn" | "error", event: string, fields: Record<string, unknown>): void {
+  console[level](
+    JSON.stringify({
+      level,
+      event,
+      time: new Date().toISOString(),
+      service: "openbackend-server",
+      ...fields
+    })
+  );
 }
 
 async function createDatabase(): Promise<DatabaseAdapter> {

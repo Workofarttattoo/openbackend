@@ -23,6 +23,7 @@
     "smoke:docker:nas": "node scripts/smoke-docker-profile.js nas",
     "smoke:docker:vps": "node scripts/smoke-docker-profile.js vps",
     "smoke:tls": "node scripts/smoke-tls-domain.js",
+    "release:check": "npm run lint && npm run build && npm test && docker compose config",
     "test": "node --test",
     "lint": "eslint ."
   },

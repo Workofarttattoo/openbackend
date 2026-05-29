@@ -20,6 +20,11 @@ This checklist gates the first self-hosted alpha.
 - [x] Scalable self-hosted deploy profiles.
 - [x] Docker profile smoke test commands for local, NAS, and VPS.
 - [x] Real-domain TLS smoke command and checklist.
+- [x] PostgreSQL and MinIO backup/restore profile support.
+- [x] GitHub Actions lint/build/test CI.
+- [x] Release packaging docs, changelog, and versioned tag process.
+- [x] Threat model, disclosure policy, and hardening checklist.
+- [x] Structured logs, metrics endpoints, health details, and audit log view.
 
 ## Should Do
 
@@ -31,13 +36,10 @@ This checklist gates the first self-hosted alpha.
 
 ## Not Blockers Yet
 
-- PostgreSQL mode.
-- MinIO adapter.
 - CRDT conflict resolution.
-- Function sandboxing for public production.
-- Full permission rules engine for public production.
-- Authenticated realtime sockets.
-- Reverse proxy TLS templates.
+- Hardened untrusted-code function sandboxing for public production.
+- Field-level permission rules for public production.
+- Signed/encrypted backups.
 
 ## Alpha Deploy Command
 
@@ -52,4 +54,11 @@ For Docker:
 
 ```bash
 docker compose up --build
+```
+
+Release candidate validation:
+
+```bash
+npm run release:check
+npm run smoke:docker
 ```

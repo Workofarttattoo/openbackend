@@ -1,6 +1,18 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Box, Database, Download, FileArchive, Play, Plus, RefreshCw, Trash2, Upload, Users } from "lucide-react";
+import {
+  Activity,
+  Box,
+  Database,
+  Download,
+  FileArchive,
+  Play,
+  Plus,
+  RefreshCw,
+  Trash2,
+  Upload,
+  Users
+} from "lucide-react";
 import { createOpenBackend, type DocumentRecord } from "@openbackend/sdk-js";
 import "./styles.css";
 
@@ -15,6 +27,8 @@ function App() {
   const [apiKeys, setApiKeys] = useState<Array<unknown>>([]);
   const [files, setFiles] = useState<Array<unknown>>([]);
   const [functions, setFunctions] = useState<Array<string>>([]);
+  const [auditLogs, setAuditLogs] = useState<Array<DocumentRecord<Record<string, unknown>>>>([]);
+  const [metrics, setMetrics] = useState<Record<string, unknown>>({});
   const [draft, setDraft] = useState('{"name":"Coffee","price":4.5}');
   const [userEmail, setUserEmail] = useState("owner@example.local");
   const [userPassword, setUserPassword] = useState("change-me-now");
@@ -33,13 +47,15 @@ function App() {
   }, [client]);
 
   const refresh = async () => {
-    const [items, userList, apiKeyList, fileList, functionList, permissions] = await Promise.all([
+    const [items, userList, apiKeyList, fileList, functionList, permissions, auditList, metricSnapshot] = await Promise.all([
       db.collection<Record<string, unknown>>(collection).list(),
       fetchJson<Array<unknown>>("/api/admin/auth/users", token),
       fetchJson<Array<unknown>>("/api/admin/auth/api-keys", token),
       fetchJson<Array<unknown>>("/api/files", token),
       fetchJson<Array<string>>("/api/functions", token),
-      fetchJson<Record<string, unknown>>("/api/admin/config/collection-permissions", token)
+      fetchJson<Record<string, unknown>>("/api/admin/config/collection-permissions", token),
+      fetchJson<Array<DocumentRecord<Record<string, unknown>>>>("/api/admin/audit-logs", token),
+      fetchJson<Record<string, unknown>>("/api/admin/metrics", token)
     ]);
 
     setDocuments(items);
@@ -48,6 +64,8 @@ function App() {
     setFiles(fileList);
     setFunctions(functionList);
     setPermissionJson(JSON.stringify(permissions, null, 2));
+    setAuditLogs(auditList);
+    setMetrics(metricSnapshot);
   };
 
   useEffect(() => {
@@ -266,6 +284,19 @@ function App() {
         </section>
 
         <section className="grid">
+          <Panel title="Health" count={Number(metrics.requestsTotal ?? 0)} icon={<Activity size={18} />}>
+            <Metrics metrics={metrics} />
+          </Panel>
+          <Panel title="Audit Logs" count={auditLogs.length}>
+            <Table
+              rows={auditLogs.map((item) => ({
+                id: item.id,
+                action: item.data.action,
+                createdAt: item.data.createdAt,
+                metadata: JSON.stringify(item.data.metadata ?? {})
+              }))}
+            />
+          </Panel>
           <Panel title="Documents" count={documents.length}>
             <Table rows={documents.map((item) => ({ id: item.id, ...item.data, rev: item.revision }))} />
           </Panel>
@@ -300,15 +331,42 @@ function App() {
   );
 }
 
-function Panel(props: { title: string; count: number; children: React.ReactNode }) {
+function Panel(props: { title: string; count: number; children: React.ReactNode; icon?: React.ReactNode }) {
   return (
     <article className="panel">
       <header>
-        <h2>{props.title}</h2>
+        <h2>{props.icon}{props.title}</h2>
         <span>{props.count}</span>
       </header>
       {props.children}
     </article>
+  );
+}
+
+function Metrics({ metrics }: { metrics: Record<string, unknown> }) {
+  const rows = [
+    "mode",
+    "database",
+    "storage",
+    "uptimeSeconds",
+    "requestsTotal",
+    "errorsTotal",
+    "rateLimitedTotal",
+    "documentsWrittenTotal",
+    "filesWrittenTotal",
+    "functionsRunTotal",
+    "auditEventsTotal"
+  ];
+
+  return (
+    <dl className="metrics-list">
+      {rows.map((key) => (
+        <React.Fragment key={key}>
+          <dt>{key}</dt>
+          <dd>{String(metrics[key] ?? "")}</dd>
+        </React.Fragment>
+      ))}
+    </dl>
   );
 }
 
